@@ -51,3 +51,10 @@ class InvalidCsvError(DatasetError):
 
     status_code = 422
     code = "invalid_csv"
+
+
+class DatasetNotFoundError(DatasetError):
+    """Dataset id does not match any stored file."""
+
+    status_code = 404
+    code = "dataset_not_found"
