@@ -67,11 +67,16 @@ class ChartService:
         categorical = frame.select_dtypes(include=list(_CATEGORICAL_DTYPES))
 
         charts = DatasetCharts(
-            histograms=[self._histogram(target, dataset_id, col, numeric[col]) for col in numeric.columns],
-            boxplots=[self._boxplot(target, dataset_id, col, numeric[col]) for col in numeric.columns],
+            histograms=[
+                self._histogram(target, dataset_id, col, numeric[col]) for col in numeric.columns
+            ],
+            boxplots=[
+                self._boxplot(target, dataset_id, col, numeric[col]) for col in numeric.columns
+            ],
             correlation_heatmap=self._correlation_heatmap(target, dataset_id, numeric),
             bar_charts=[
-                self._bar_chart(target, dataset_id, col, categorical[col]) for col in categorical.columns
+                self._bar_chart(target, dataset_id, col, categorical[col])
+                for col in categorical.columns
             ],
             category_distributions=self._category_distribution(target, dataset_id, categorical),
         )
