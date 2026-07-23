@@ -38,6 +38,11 @@ class Settings(BaseSettings):
         description="Maximum accepted upload size in megabytes.",
     )
 
+    charts_static_url_prefix: str = Field(
+        default="/static/charts",
+        description="URL prefix under which generated charts are served.",
+    )
+
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024

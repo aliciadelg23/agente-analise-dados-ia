@@ -66,3 +66,7 @@ scratch/
 # Runtime uploads (keep the directory structure via .gitkeep)
 storage/uploads/*
 !storage/uploads/.gitkeep
+
+# Runtime charts (keep the directory structure via .gitkeep)
+storage/charts/*
+!storage/charts/.gitkeep
