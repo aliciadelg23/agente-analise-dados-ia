@@ -1,0 +1,38 @@
+"""Application settings loaded from environment variables.
+
+Uses pydantic-settings so values can come from process environment,
+an ``.env`` file, or be overridden explicitly in tests via
+``get_settings.cache_clear()``.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Runtime settings validated at startup."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    app_env: str = Field(default="development", description="Runtime environment name.")
+    app_host: str = Field(default="0.0.0.0", description="Bind host for the HTTP server.")
+    app_port: int = Field(default=8000, description="Bind port for the HTTP server.")
+    log_level: str = Field(default="INFO", description="Root logger level.")
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return a cached Settings instance.
+
+    Tests can reset the cache by calling ``get_settings.cache_clear()``.
+    """
+    return Settings()
