@@ -153,6 +153,64 @@ Documentação interativa gerada pelo FastAPI:
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
 
+### Deploy
+
+Três alvos de deploy suportados, cada um com um arquivo de configuração no repositório. Todos reaproveitam o mesmo `Dockerfile`.
+
+| Plataforma | Config | Storage persistente | Como subir |
+|-----------|--------|---------------------|------------|
+| Render | `render.yaml` | Persistent Disk 1GB em `/app/storage` | Conectar o repo em Render → "New Blueprint" → confirmar `render.yaml`. |
+| Railway | `railway.toml` | Volume criado via UI, montado em `/app/storage` | `railway link` + `railway up`, ou conectar o repo pelo dashboard. |
+| Fly.io | `fly.toml` | Volume `data` (criar com `fly volumes create data --size 1`) | `fly launch --no-deploy` (uma vez) → `fly volumes create data --size 1` → `fly deploy`. |
+
+**Variáveis de ambiente** — para os três alvos, defina no painel da plataforma:
+
+- `OPENAI_API_KEY` (obrigatório se for usar `/insights`, `/agent/chat`, `/workflows/analyze`)
+- `ANTHROPIC_API_KEY` e/ou `GEMINI_API_KEY` (opcionais; ativam esses providers)
+- Modelos default (`OPENAI_MODEL`, etc.) podem ser sobrescritos aqui também
+
+Os valores padrão de `APP_ENV`, `APP_HOST`, `APP_PORT`, `STORAGE_DIR` e `LOG_LEVEL` já vêm nos arquivos de config — não precisa setar de novo.
+
+**Health check** — todos os três apontam para `GET /health`. A resposta é `{"status": "ok", "version": "..."}`.
+
+**Dashboard em cloud** — por default só a API é publicada. Para expor o dashboard também:
+
+- Render → clonar o service `api` como `dashboard` no `render.yaml`, mudar `dockerCommand` para `streamlit run dashboard/Home.py --server.port $PORT`, e apontar `API_BASE_URL` para a URL interna do outro service.
+- Railway → criar segundo service apontando pro mesmo repo, `startCommand` streamlit.
+- Fly.io → adicionar `[[services]]` com internal_port 8501 ou criar app separado.
+
+### CI/CD
+
+Dois workflows em `.github/workflows/`:
+
+| Workflow | Trigger | O que faz |
+|----------|---------|-----------|
+| `ci.yml` | push/PR em `main` | Ruff (lint + format), Black, Pytest via `uv`. |
+| `docker-build.yml` | push/PR em `main` mudando `Dockerfile`, deps ou código de `app/` e `dashboard/` | `docker buildx build` sem push + smoke test importando `app.main` dentro da imagem. |
+
+**Deploy automático** — não configurado por default (evita commit de secrets). Como habilitar:
+
+- **Render** → o Blueprint (`render.yaml`) tem `autoDeploy: true`; qualquer push em `main` dispara build.
+- **Railway** → conectar o repo e ativar auto-deploy no dashboard.
+- **Fly.io** → adicionar um job GitHub Actions que roda `flyctl deploy --remote-only` usando `FLY_API_TOKEN` como secret:
+
+```yaml
+# .github/workflows/fly-deploy.yml (exemplo — não commitado)
+name: Fly Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+```
+
 ### Docker
 
 Todo o stack roda em containers via `docker compose`. A mesma imagem serve API e dashboard — apenas o `command` muda.
@@ -837,10 +895,11 @@ Etapas concluídas:
 12. **Etapa 12** — banco vetorial com ChromaDB: quatro collections indexando EDA, insights, modelos e relatórios; `POST /vector/index/{dataset_id}` e `POST /vector/query` expõem indexação manual e busca semântica; o workflow da Etapa 11 alimenta o índice automaticamente.
 13. **Etapa 13** — dashboard Streamlit multi-página em `dashboard/`: Home + 6 páginas (Upload, Visualizations, Training, Insights, Chat, Explanations) consumindo a API via `dashboard/api_client.py`; tema dark configurado em `.streamlit/config.toml`; testes cobrindo o cliente HTTP.
 14. **Etapa 14** — dockerização completa: `Dockerfile` single-stage com uv e usuário não-root; `docker-compose.yml` com serviços `api` e `dashboard`, volume persistente para `storage/`, healthchecks via `curl`, `depends_on` entre serviços.
+15. **Etapa 15** — preparação de deploy: `render.yaml` (Blueprint), `railway.toml` e `fly.toml`; workflow `docker-build.yml` valida a imagem em cada push/PR; deploy automático documentado sem committar secrets.
 
 Próximas etapas planejadas:
 
-15. Persistência estruturada e camada de repositório sobre banco de dados.
+16. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
