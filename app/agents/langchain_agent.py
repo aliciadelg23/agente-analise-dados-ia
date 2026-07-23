@@ -40,9 +40,7 @@ def build_agent(
     not configured, matching the stage 8 LLM abstraction contract.
     """
     if not api_key:
-        raise MissingCredentialsError(
-            "OPENAI_API_KEY is required to run the LangChain agent."
-        )
+        raise MissingCredentialsError("OPENAI_API_KEY is required to run the LangChain agent.")
     llm = ChatOpenAI(api_key=api_key, model=model, temperature=temperature)
     return create_agent(model=llm, tools=tools, system_prompt=_SYSTEM_PROMPT)
 

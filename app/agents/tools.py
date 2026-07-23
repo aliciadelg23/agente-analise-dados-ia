@@ -43,9 +43,7 @@ class _ColumnStatsInput(BaseModel):
 class _TrainInput(BaseModel):
     dataset_id: str = Field(..., description="Server-generated dataset identifier (UUID).")
     target_column: str = Field(..., description="Name of the target column.")
-    problem_type: str = Field(
-        ..., description="Problem type: 'classification' or 'regression'."
-    )
+    problem_type: str = Field(..., description="Problem type: 'classification' or 'regression'.")
 
 
 def _parse_uuid(value: str) -> UUID | None:
