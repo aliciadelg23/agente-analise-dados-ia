@@ -39,3 +39,14 @@ class DatasetRepository:
         target = self._uploads_dir / f"{dataset_id}{extension}"
         target.write_bytes(content)
         return target
+
+    def find(self, dataset_id: UUID) -> Path | None:
+        """Return the stored file for ``dataset_id`` or None if missing.
+
+        Matches any extension so a future change to accept .tsv or
+        parquet does not require touching this lookup.
+        """
+        if not self._uploads_dir.exists():
+            return None
+        matches = sorted(self._uploads_dir.glob(f"{dataset_id}.*"))
+        return matches[0] if matches else None
