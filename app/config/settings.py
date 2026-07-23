@@ -47,6 +47,26 @@ class Settings(BaseSettings):
         description="Subdirectory under storage_dir where trained models are persisted.",
     )
 
+    default_llm_provider: str = Field(
+        default="openai",
+        description="Provider used when callers do not specify one: openai, anthropic, or gemini.",
+    )
+    openai_api_key: str | None = Field(default=None, description="OpenAI API key.")
+    openai_model: str = Field(
+        default="gpt-4o-mini",
+        description="Default model for the OpenAI provider.",
+    )
+    anthropic_api_key: str | None = Field(default=None, description="Anthropic API key.")
+    anthropic_model: str = Field(
+        default="claude-haiku-4-5-20251001",
+        description="Default model for the Anthropic provider.",
+    )
+    gemini_api_key: str | None = Field(default=None, description="Google Gemini API key.")
+    gemini_model: str = Field(
+        default="gemini-2.5-flash",
+        description="Default model for the Gemini provider.",
+    )
+
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
