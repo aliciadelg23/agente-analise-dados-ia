@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api.routes import datasets, health, info
+from app.api.routes import agent, datasets, health, info
 from app.api.routes import models as models_routes
 from app.config.settings import get_settings
 from app.core.exception_handlers import register_exception_handlers
@@ -42,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(datasets.router)
     app.include_router(models_routes.router)
+    app.include_router(agent.router)
 
     charts_dir = Path(settings.storage_dir) / "charts"
     charts_dir.mkdir(parents=True, exist_ok=True)

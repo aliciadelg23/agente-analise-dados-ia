@@ -1,11 +1,15 @@
-"""LangChain agent that orchestrates the app's tools."""
+"""LangChain agent that orchestrates the app's tools.
+
+LangChain 1.x switched to ``create_agent`` returning a compiled
+LangGraph state machine. This module wraps that surface with a
+small factory the API layer can call.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import create_agent
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 
@@ -23,46 +27,38 @@ _SYSTEM_PROMPT = (
 )
 
 
-def build_agent_executor(
+def build_agent(
     tools: list[BaseTool],
     *,
     api_key: str | None,
     model: str,
     temperature: float = 0.0,
-    max_iterations: int = 6,
-    verbose: bool = False,
-) -> AgentExecutor:
-    """Build an ``AgentExecutor`` wired to ``tools`` and ChatOpenAI.
+) -> Any:
+    """Build a LangChain agent wired to ``tools`` and ChatOpenAI.
 
-    Raises ``MissingCredentialsError`` at construction time when the
-    OpenAI API key is not configured, matching the behavior of the
-    LLM abstraction from stage 8.
+    Raises ``MissingCredentialsError`` when the OpenAI API key is
+    not configured, matching the stage 8 LLM abstraction contract.
     """
     if not api_key:
         raise MissingCredentialsError(
             "OPENAI_API_KEY is required to run the LangChain agent."
         )
-
     llm = ChatOpenAI(api_key=api_key, model=model, temperature=temperature)
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", _SYSTEM_PROMPT),
-            ("placeholder", "{chat_history}"),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ]
-    )
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=verbose,
-        max_iterations=max_iterations,
-        return_intermediate_steps=False,
-    )
+    return create_agent(model=llm, tools=tools, system_prompt=_SYSTEM_PROMPT)
 
 
-def run_agent(executor: AgentExecutor, query: str) -> dict[str, Any]:
-    """Invoke ``executor`` with ``query`` and return the raw result dict."""
+def run_agent(agent: Any, query: str) -> str:
+    """Invoke ``agent`` with ``query`` and return the final answer text."""
     logger.info("Agent query: %s", query[:200])
-    return executor.invoke({"input": query})
+    result = agent.invoke({"messages": [{"role": "user", "content": query}]})
+    messages = result.get("messages", [])
+    if not messages:
+        return ""
+    final = messages[-1]
+    content = getattr(final, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [part.get("text", "") for part in content if isinstance(part, dict)]
+        return "".join(parts)
+    return str(content) if content is not None else ""
