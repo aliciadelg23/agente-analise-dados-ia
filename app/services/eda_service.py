@@ -28,7 +28,7 @@ from app.utils.formatting import human_readable_size
 logger = get_logger(__name__)
 
 _NUMERIC_KINDS: tuple[str, ...] = ("number",)
-_CATEGORICAL_KINDS: tuple[str, ...] = ("object", "category", "bool")
+_CATEGORICAL_KINDS: tuple[str, ...] = ("object", "str", "category", "bool")
 
 
 class EDAService:
@@ -57,8 +57,8 @@ class EDAService:
 
         return DatasetSummaryResponse(
             dataset_id=dataset_id,
-            rows=int(len(frame)),
-            columns=int(len(frame.columns)),
+            rows=len(frame),
+            columns=len(frame.columns),
             memory=human_readable_size(int(frame.memory_usage(deep=True).sum())),
             duplicates=int(frame.duplicated().sum()),
             null_counts=self._null_counts(frame),
