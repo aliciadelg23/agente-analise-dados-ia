@@ -83,6 +83,8 @@ A API sobe em `http://localhost:8000`.
 | `POST` | `/datasets/{dataset_id}/insights` | Insights gerados por LLM sobre o dataset (resumo, anomalias, sugestões, riscos). |
 | `POST` | `/agent/chat` | Agente LangChain com acesso a 5 ferramentas (dataset, EDA, estatísticas, ML, gráficos). |
 | `POST` | `/workflows/analyze` | Workflow LangGraph com 6 agentes especializados (Planner → EDA → Cleaning → ML → Insights → Report). |
+| `POST` | `/vector/index/{dataset_id}` | Indexa EDA + modelos vinculados de um dataset no banco vetorial. |
+| `POST` | `/vector/query` | Busca semântica sobre EDAs, insights, modelos e relatórios armazenados. |
 
 ### Exemplos
 
@@ -150,6 +152,61 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Banco vetorial (ChromaDB)
+
+Um `PersistentClient` do ChromaDB persiste em `storage/chromadb/` (configurável via `CHROMADB_DIR_NAME`) e indexa os artefatos produzidos pelo restante do pipeline em quatro collections:
+
+| Collection | Chave primária | Conteúdo indexado |
+|-----------|-----------------|--------------------|
+| `dataset_eda` | `dataset_id` | Texto resumindo o EDA (linhas, colunas, tipos, colunas com nulos pesados). |
+| `dataset_insights` | `dataset_id` | `executive_summary` + insights, anomalias, sugestões e riscos. |
+| `dataset_models` | `model_id` | Manifest do modelo (algoritmo, target, features, CV score). |
+| `dataset_reports` | `dataset_id + timestamp` | Relatório markdown final do workflow. |
+
+**Embeddings**: default do ChromaDB (`all-MiniLM-L6-v2` via ONNX Runtime). Rodam localmente, sem chave de API. Modelo baixado uma vez (~79 MB) e cacheado em `~/.cache/chroma`.
+
+**Indexação automática**: o workflow multi-agente da Etapa 11 chama `VectorIndexService.index_*` após cada nó — o `EDANode` indexa o EDA, o `MLNode` indexa o modelo treinado, o `InsightNode` indexa os insights e o `ReportNode` indexa o relatório final.
+
+**Indexação manual**: `POST /vector/index/{dataset_id}` roda o EDA no momento e indexa todos os modelos cujo manifest referencia esse `dataset_id`. Útil para incorporar datasets anteriores à indexação automática.
+
+**Query**:
+
+```bash
+curl -X POST http://localhost:8000/vector/query \
+  -H "content-type: application/json" \
+  -d '{
+    "query": "which datasets had heavy null values in the target column?",
+    "top_k": 5,
+    "type_filter": "eda"
+  }'
+```
+
+- `query` — texto natural.
+- `top_k` — número máximo de matches (1-50, default 5).
+- `type_filter` — opcional; um de `eda`, `insights`, `model`, `report`. Se omitido, busca em todas as collections e ordena os resultados por distância ascendente.
+
+Response:
+
+```json
+{
+  "matches": [
+    {
+      "collection": "dataset_eda",
+      "item_id": "<dataset_id>",
+      "document": "Dataset <id> has 1250 rows and 18 columns. ...",
+      "metadata": {"dataset_id": "...", "type": "eda", "rows": 1250},
+      "distance": 0.42
+    }
+  ]
+}
+```
+
+**Notas**:
+
+- Distâncias são cosine (0 = idêntico); ordenação ascendente.
+- Testes do serviço usam um Chroma real em diretório temporário — offline, sem mocks, ~7s.
+- Migração para embeddings do OpenAI é 1 arquivo (`VectorRepository` aceita `embedding_function` no `create_collection`).
 
 ### Workflow multi-agente (LangGraph)
 
@@ -693,10 +750,11 @@ Etapas concluídas:
 9. **Etapa 9** — insights gerados por LLM via `POST /datasets/{id}/insights`: EDA feed ao modelo, resposta estruturada com resumo executivo, insights, anomalias, sugestões e riscos; fallback para `raw_llm_response` quando o modelo não devolve JSON.
 10. **Etapa 10** — agente LangChain via `POST /agent/chat`: cinco ferramentas (`dataset_info`, `dataset_summary`, `column_statistics`, `train_model`, `generate_charts`) e um agente `create_agent` (LangChain 1.x) sobre `ChatOpenAI` capaz de encadear as chamadas para responder em linguagem natural.
 11. **Etapa 11** — workflow multi-agente com LangGraph via `POST /workflows/analyze`: seis agentes especializados (Planner, EDA, Cleaning, ML, Insights, Report) encadeados em um `StateGraph` linear com `WorkflowState` compartilhado; cada agente carrega uma responsabilidade única e é testado isoladamente.
+12. **Etapa 12** — banco vetorial com ChromaDB: quatro collections indexando EDA, insights, modelos e relatórios; `POST /vector/index/{dataset_id}` e `POST /vector/query` expõem indexação manual e busca semântica; o workflow da Etapa 11 alimenta o índice automaticamente.
 
 Próximas etapas planejadas:
 
-12. Persistência estruturada e camada de repositório sobre banco de dados.
+13. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
