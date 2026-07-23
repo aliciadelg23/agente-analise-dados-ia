@@ -12,6 +12,7 @@ from pathlib import Path
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.dataset_service import DatasetService
+from app.services.eda_service import EDAService
 
 
 @lru_cache(maxsize=1)
@@ -29,3 +30,10 @@ def get_dataset_service(settings: Settings | None = None) -> DatasetService:
         repository=repository,
         max_size_bytes=resolved.max_upload_size_bytes,
     )
+
+
+def get_eda_service(settings: Settings | None = None) -> EDAService:
+    """Return an EDAService bound to the current settings."""
+    resolved = settings or get_settings()
+    repository = _dataset_repository(resolved.storage_dir)
+    return EDAService(repository=repository)
