@@ -153,6 +153,37 @@ Documentação interativa gerada pelo FastAPI:
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
 
+### Dashboard (Streamlit)
+
+Um dashboard multi-página em `dashboard/` consome a API via HTTP e expõe os principais fluxos em uma UI. Cada página é um arquivo dentro de `dashboard/pages/` — o Streamlit descobre e adiciona ao sidebar automaticamente.
+
+**Como rodar** (com o backend já em `http://localhost:8000`):
+
+```bash
+uv run streamlit run dashboard/Home.py
+```
+
+- Alterar o backend: `API_BASE_URL=http://outro-host:8000 uv run streamlit run dashboard/Home.py`
+- Configuração visual: `.streamlit/config.toml` (tema dark, cor primária azul neutra).
+
+**Páginas**:
+
+| Página | Endpoint(s) consumido(s) | O que faz |
+|--------|--------------------------|-----------|
+| **Home** | `GET /`, `GET /health` | Status da API e do dataset ativo. |
+| **Upload** | `POST /datasets/upload` | Envia um CSV e mostra metadados. |
+| **Visualizations** | `GET /datasets/{id}/summary`, `GET /datasets/{id}/charts` | Métricas, dtypes, nulos e imagens PNG. |
+| **Training** | `POST /datasets/{id}/train` | Selectbox de target, tabela de métricas por candidato, guarda `model_id`. |
+| **Insights** | `POST /datasets/{id}/insights` | Resumo executivo + listas de insights/anomalias/sugestões/riscos. |
+| **Chat** | `POST /agent/chat` | Chat multi-turn com histórico em `st.session_state`. |
+| **Explanations** | `GET /models/{id}/explain` | Feature importance, SHAP values, summary plot. |
+
+**Estado compartilhado** — `st.session_state` mantém `dataset_id`, `model_id`, histórico do chat e a última explicação entre navegações. Isso permite fluxos como: upload → visualizar → treinar → explicar sem repetir input.
+
+**Cliente HTTP** — `dashboard/api_client.py` centraliza todas as chamadas. Erros da API são convertidos em `APIError(status_code, message)`, com fallback pro texto bruto se o corpo não for JSON.
+
+**Testes** — `tests/test_dashboard_api_client.py` cobre o cliente HTTP com `httpx.Client` patchado. Não há testes da UI Streamlit (não há lógica não-trivial a testar).
+
 ### Banco vetorial (ChromaDB)
 
 Um `PersistentClient` do ChromaDB persiste em `storage/chromadb/` (configurável via `CHROMADB_DIR_NAME`) e indexa os artefatos produzidos pelo restante do pipeline em quatro collections:
@@ -751,10 +782,11 @@ Etapas concluídas:
 10. **Etapa 10** — agente LangChain via `POST /agent/chat`: cinco ferramentas (`dataset_info`, `dataset_summary`, `column_statistics`, `train_model`, `generate_charts`) e um agente `create_agent` (LangChain 1.x) sobre `ChatOpenAI` capaz de encadear as chamadas para responder em linguagem natural.
 11. **Etapa 11** — workflow multi-agente com LangGraph via `POST /workflows/analyze`: seis agentes especializados (Planner, EDA, Cleaning, ML, Insights, Report) encadeados em um `StateGraph` linear com `WorkflowState` compartilhado; cada agente carrega uma responsabilidade única e é testado isoladamente.
 12. **Etapa 12** — banco vetorial com ChromaDB: quatro collections indexando EDA, insights, modelos e relatórios; `POST /vector/index/{dataset_id}` e `POST /vector/query` expõem indexação manual e busca semântica; o workflow da Etapa 11 alimenta o índice automaticamente.
+13. **Etapa 13** — dashboard Streamlit multi-página em `dashboard/`: Home + 6 páginas (Upload, Visualizations, Training, Insights, Chat, Explanations) consumindo a API via `dashboard/api_client.py`; tema dark configurado em `.streamlit/config.toml`; testes cobrindo o cliente HTTP.
 
 Próximas etapas planejadas:
 
-13. Persistência estruturada e camada de repositório sobre banco de dados.
+14. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
