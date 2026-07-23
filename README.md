@@ -82,6 +82,7 @@ A API sobe em `http://localhost:8000`.
 | `GET` | `/models/{model_id}/explain` | Explicabilidade: feature importance, SHAP e gráfico. |
 | `POST` | `/datasets/{dataset_id}/insights` | Insights gerados por LLM sobre o dataset (resumo, anomalias, sugestões, riscos). |
 | `POST` | `/agent/chat` | Agente LangChain com acesso a 5 ferramentas (dataset, EDA, estatísticas, ML, gráficos). |
+| `POST` | `/workflows/analyze` | Workflow LangGraph com 6 agentes especializados (Planner → EDA → Cleaning → ML → Insights → Report). |
 
 ### Exemplos
 
@@ -149,6 +150,62 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Workflow multi-agente (LangGraph)
+
+O endpoint `POST /workflows/analyze` executa um pipeline determinístico construído com LangGraph. Seis agentes especializados carregam responsabilidades bem separadas e compartilham uma única `WorkflowState`:
+
+```text
+START → Planner → EDA → Cleaning → ML → Insights → Report → END
+```
+
+| Agente | Responsabilidade | Onde |
+|--------|------------------|------|
+| **Planner** | Decide se treina ML, valida target/problem_type, deixa a rota estável mesmo sem LLM. | `app/agents/graph/planner.py` |
+| **EDA** | Executa `EDAService.summarize` e escreve `eda_summary` no state. | `app/agents/graph/eda.py` |
+| **Cleaning** | Aplica `CleaningService.clean` (defaults) e publica `cleaned_dataset_id` + `cleaning_report`. | `app/agents/graph/cleaning.py` |
+| **ML** | Treina via `MLPipelineService` no dataset limpo quando o Planner permitir; caso contrário passa `ml_result=None`. | `app/agents/graph/ml.py` |
+| **Insights** | Chama `AIInsightService.analyze` usando o LLM configurado. | `app/agents/graph/insights.py` |
+| **Report** | Serializa toda a `WorkflowState` e pede ao LLM um relatório markdown com seções fixas. | `app/agents/graph/report.py` |
+
+**Request**:
+
+```json
+{
+  "dataset_id": "...",
+  "user_query": "Analyze this dataset and predict churn.",
+  "target_column": "churn",
+  "problem_type": "classification",
+  "run_ml": true,
+  "llm_provider": "openai"
+}
+```
+
+- `dataset_id` — obrigatório.
+- `user_query` — texto livre incluído no state para o Report Agent citar.
+- `target_column`, `problem_type` — opcionais; se ausentes o Planner desliga o passo de ML.
+- `run_ml` — default `true`.
+- `llm_provider` — opcional; sobrescreve `DEFAULT_LLM_PROVIDER` para Insight e Report.
+
+**Response** — inclui `plan`, `eda_summary`, `cleaning_report`, `ml_result` (ou `null`), `insights` e o `final_report` em markdown.
+
+**Exemplo**:
+
+```bash
+curl -X POST http://localhost:8000/workflows/analyze \
+  -H "content-type: application/json" \
+  -d '{
+    "dataset_id": "<id>",
+    "target_column": "churn",
+    "problem_type": "classification"
+  }'
+```
+
+**Notas**:
+
+- Cada nó tem uma única responsabilidade e recebe os services por injeção — torna-se testável isoladamente com mocks.
+- A ordem é linear na Etapa 11; branching condicional (ex.: pular Cleaning se o dataset já vier limpo) pode ser adicionado depois usando `add_conditional_edges` do LangGraph.
+- Nenhum teste automatizado toca o LLM real — Insights e Report são mockados via `LLMProvider`.
 
 ### Agente LangChain
 
@@ -635,10 +692,10 @@ Etapas concluídas:
 8. **Etapa 8** — camada de abstração de LLMs em `app/llms/`: interface comum (`LLMProvider`), providers para OpenAI, Anthropic e Google Gemini, factory por nome, configuração via `.env`, sem endpoint HTTP nesta etapa.
 9. **Etapa 9** — insights gerados por LLM via `POST /datasets/{id}/insights`: EDA feed ao modelo, resposta estruturada com resumo executivo, insights, anomalias, sugestões e riscos; fallback para `raw_llm_response` quando o modelo não devolve JSON.
 10. **Etapa 10** — agente LangChain via `POST /agent/chat`: cinco ferramentas (`dataset_info`, `dataset_summary`, `column_statistics`, `train_model`, `generate_charts`) e um agente `create_agent` (LangChain 1.x) sobre `ChatOpenAI` capaz de encadear as chamadas para responder em linguagem natural.
+11. **Etapa 11** — workflow multi-agente com LangGraph via `POST /workflows/analyze`: seis agentes especializados (Planner, EDA, Cleaning, ML, Insights, Report) encadeados em um `StateGraph` linear com `WorkflowState` compartilhado; cada agente carrega uma responsabilidade única e é testado isoladamente.
 
 Próximas etapas planejadas:
 
-11. Primeiro pipeline de análise ponta a ponta.
 12. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
