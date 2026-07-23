@@ -44,10 +44,20 @@ async def chat(
         ml_pipeline_service=ml_pipeline_service,
         chart_service=chart_service,
     )
-    model = request.model or settings.openai_model
+
+    provider = (settings.default_llm_provider or "openai").lower()
+    provider_config = {
+        "openai": (settings.openai_api_key, settings.openai_model),
+        "gemini": (settings.gemini_api_key, settings.gemini_model),
+        "anthropic": (settings.anthropic_api_key, settings.anthropic_model),
+    }
+    api_key, default_model = provider_config.get(provider, (None, ""))
+    model = request.model or default_model
+
     agent = build_agent(
         tools,
-        api_key=settings.openai_api_key,
+        provider=provider,
+        api_key=api_key,
         model=model,
     )
     output = run_agent(agent, request.query)
