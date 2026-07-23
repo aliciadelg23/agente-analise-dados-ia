@@ -34,9 +34,7 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
-async def _validation_error_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def _validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     logger.info(
         "validation_error while handling %s %s: %s",
         request.method,
@@ -56,9 +54,7 @@ async def _validation_error_handler(
 
 
 async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception(
-        "unhandled_error while handling %s %s", request.method, request.url.path
-    )
+    logger.exception("unhandled_error while handling %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
         content=_error_payload("internal_error", "Unexpected error."),

@@ -7,7 +7,7 @@ which are translated to HTTP responses by the global handlers.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from app.core.exceptions import (
@@ -52,7 +52,7 @@ class DatasetService:
             rows=metadata.rows,
             columns=metadata.column_count,
             size=human_readable_size(len(content)),
-            uploaded_at=datetime.now(timezone.utc),
+            uploaded_at=datetime.now(UTC),
             encoding=metadata.encoding,
             separator=metadata.separator,
         )
@@ -61,8 +61,7 @@ class DatasetService:
         lowered = filename.lower()
         if not any(lowered.endswith(ext) for ext in _ALLOWED_EXTENSIONS):
             raise InvalidFileExtensionError(
-                "Unsupported file extension. Allowed: "
-                + ", ".join(sorted(_ALLOWED_EXTENSIONS))
+                "Unsupported file extension. Allowed: " + ", ".join(sorted(_ALLOWED_EXTENSIONS))
             )
 
     def _validate_size(self, size_bytes: int) -> None:

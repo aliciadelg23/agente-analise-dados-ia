@@ -62,6 +62,9 @@ def inspect_csv(path: Path) -> DatasetMetadata:
     if not raw:
         raise EmptyFileError("Uploaded file is empty.")
 
+    if b"\x00" in raw[:_ENCODING_SAMPLE_BYTES]:
+        raise InvalidCsvError("File contains null bytes and is not a text CSV.")
+
     encoding = detect_encoding(raw)
     try:
         text_sample = raw[:_SEPARATOR_SAMPLE_BYTES].decode(encoding, errors="replace")
@@ -83,7 +86,7 @@ def inspect_csv(path: Path) -> DatasetMetadata:
 
     columns = tuple(ColumnInfo(name=str(col), dtype=str(frame[col].dtype)) for col in frame.columns)
     return DatasetMetadata(
-        rows=int(len(frame)),
+        rows=len(frame),
         columns=columns,
         encoding=encoding,
         separator=separator,

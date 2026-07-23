@@ -49,6 +49,7 @@ select = [
 ]
 ignore = [
     "E501", # line length handled by black/ruff formatter
+    "B008", # FastAPI Depends/File/Query intentionally used as defaults
 ]
 
 [tool.ruff.lint.per-file-ignores]
