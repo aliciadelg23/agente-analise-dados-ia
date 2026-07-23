@@ -32,6 +32,28 @@ HTTP  →  app/api/routes  →  app/services  →  app/agents / app/pipelines
                           app/repositories  →  storage
 ```
 
+## Tratamento de erros
+
+- Exceções de domínio herdam de `app.core.exceptions.AppError`, que carrega `status_code` e `code`.
+- `app.core.exception_handlers.register_exception_handlers()` converte `AppError`, `RequestValidationError` e `Exception` em respostas com o formato:
+
+```json
+{ "error": { "code": "invalid_file_extension", "message": "Unsupported file extension." } }
+```
+
+- Erros esperados são logados como `warning`; erros inesperados como `exception` (com traceback).
+
+## Fluxo do upload de datasets (Etapa 2)
+
+```text
+POST /datasets/upload
+  → app/api/routes/datasets.py       parse UploadFile
+  → app/services/DatasetService      valida extensão, tamanho, não-vazio
+      → app/repositories/DatasetRepository   persiste em disco
+      → app/utils/csv_inspector              detecta encoding/sep/tipos
+  → DatasetUploadResponse (Pydantic)
+```
+
 ## Onde adicionar coisas novas
 
 - Novo endpoint: criar um módulo em `app/api/routes/` e registrar no `create_app()`.

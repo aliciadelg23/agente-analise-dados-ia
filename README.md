@@ -66,17 +66,55 @@ uv sync --all-groups
 uv run uvicorn app.main:app --reload
 ```
 
-A API sobe em `http://localhost:8000`. Endpoint de verificação:
+A API sobe em `http://localhost:8000`.
+
+### Endpoints disponíveis
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/` | Informações da API (nome, versão, ambiente). |
+| `GET` | `/health` | Status de liveness. |
+| `POST` | `/datasets/upload` | Recebe um CSV, valida, persiste e retorna metadados. |
+
+### Exemplos
 
 ```bash
+# Info
+curl http://localhost:8000/
+# {"name":"Agente de Analise de Dados com IA","version":"0.1.0",...}
+
+# Health
 curl http://localhost:8000/health
 # {"status":"ok","version":"0.1.0"}
+
+# Upload de CSV
+curl -X POST http://localhost:8000/datasets/upload \
+  -F "file=@caminho/para/dataset.csv"
+# {
+#   "dataset_id": "...",
+#   "filename": "dataset.csv",
+#   "rows": 1250,
+#   "columns": 18,
+#   "size": "1.2 MB",
+#   "uploaded_at": "2026-07-23T00:00:00Z",
+#   "encoding": "utf-8",
+#   "separator": ","
+# }
 ```
 
 Documentação interativa gerada pelo FastAPI:
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
+- OpenAPI JSON: `http://localhost:8000/openapi.json`
+
+### Upload de datasets
+
+- Extensão aceita: `.csv`.
+- Tamanho máximo: definido por `MAX_UPLOAD_SIZE_MB` (padrão 50 MB).
+- Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
+- O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
+- Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
 
 ## Qualidade
 
@@ -108,12 +146,17 @@ O workflow em `.github/workflows/ci.yml` executa lint, verificação de formata�
 
 ## Roadmap
 
-Esta é a etapa 1 (scaffolding). Próximas etapas planejadas:
+Etapas concluídas:
 
-1. Configuração de provedores de LLM em `app/llms/`.
-2. Definição de contratos base para agentes em `app/agents/`.
-3. Primeiro pipeline de análise ponta a ponta.
-4. Persistência e camada de repositório.
+1. **Etapa 1** — scaffolding da arquitetura, configuração base, logging, CI.
+2. **Etapa 2** — API FastAPI com endpoints `/`, `/health`, `/datasets/upload`, tratamento global de exceções, validação Pydantic e inspeção de CSV com Pandas (encoding, separador, tipos de coluna).
+
+Próximas etapas planejadas:
+
+3. Configuração de provedores de LLM em `app/llms/`.
+4. Definição de contratos base para agentes em `app/agents/`.
+5. Primeiro pipeline de análise ponta a ponta.
+6. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
