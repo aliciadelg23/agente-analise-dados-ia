@@ -19,6 +19,7 @@ dependencies = [
     "plotly>=5.24",
     "scikit-learn>=1.5",
     "joblib>=1.4",
+    "shap>=0.45",
 ]
 
 [dependency-groups]
