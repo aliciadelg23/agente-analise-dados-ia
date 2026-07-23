@@ -157,8 +157,10 @@ class CleaningService:
             series = frame[column]
             if series.dtype.name not in _STRING_DTYPES:
                 continue
-            trimmed = series.astype("object").where(series.notna(), None).map(
-                lambda value: value.strip() if isinstance(value, str) else value
+            trimmed = (
+                series.astype("object")
+                .where(series.notna(), None)
+                .map(lambda value: value.strip() if isinstance(value, str) else value)
             )
             emptied = trimmed.map(lambda value: np.nan if value == "" else value)
             if not emptied.equals(series):

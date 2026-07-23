@@ -10,12 +10,14 @@ from fastapi.testclient import TestClient
 
 from app.api.dependencies import (
     _dataset_repository,
+    get_cleaning_service,
     get_dataset_service,
     get_eda_service,
 )
 from app.config.settings import get_settings
 from app.main import app
 from app.repositories.dataset_repository import DatasetRepository
+from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
 
@@ -49,6 +51,12 @@ def eda_service(dataset_repository: DatasetRepository) -> EDAService:
 
 
 @pytest.fixture
+def cleaning_service(dataset_repository: DatasetRepository) -> CleaningService:
+    """Build a CleaningService pointing at an isolated storage."""
+    return CleaningService(repository=dataset_repository)
+
+
+@pytest.fixture
 def client(temp_storage: Path) -> Iterator[TestClient]:
     """FastAPI test client with dataset storage swapped to a temp dir."""
     get_settings.cache_clear()
@@ -67,12 +75,19 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
         repository.ensure_ready()
         return EDAService(repository=repository)
 
+    def _override_cleaning() -> CleaningService:
+        repository = DatasetRepository(temp_storage)
+        repository.ensure_ready()
+        return CleaningService(repository=repository)
+
     app.dependency_overrides[get_dataset_service] = _override_dataset
     app.dependency_overrides[get_eda_service] = _override_eda
+    app.dependency_overrides[get_cleaning_service] = _override_cleaning
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_dataset_service, None)
         app.dependency_overrides.pop(get_eda_service, None)
+        app.dependency_overrides.pop(get_cleaning_service, None)
         get_settings.cache_clear()
         _dataset_repository.cache_clear()

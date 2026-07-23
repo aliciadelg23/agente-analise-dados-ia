@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, File, Path, UploadFile, status
+from fastapi import APIRouter, Depends, File, Path, UploadFile, status
 
 from app.api.dependencies import (
     get_cleaning_service,
@@ -58,7 +58,7 @@ async def get_dataset_summary(
 )
 async def clean_dataset(
     dataset_id: UUID = Path(..., description="Source dataset identifier."),
-    options: CleaningOptions = Body(default_factory=CleaningOptions),
+    options: CleaningOptions | None = None,
     service: CleaningService = Depends(get_cleaning_service),
 ) -> DatasetCleanResponse:
     """Run the cleaning pipeline and return the report plus the new id.
@@ -67,4 +67,4 @@ async def clean_dataset(
     stored under a fresh dataset id and can be queried by any of the
     other dataset endpoints.
     """
-    return service.clean(dataset_id, options)
+    return service.clean(dataset_id, options or CleaningOptions())

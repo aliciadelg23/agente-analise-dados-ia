@@ -9,6 +9,8 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from fastapi import Depends
+
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_service import CleaningService
@@ -23,25 +25,28 @@ def _dataset_repository(base_dir: str) -> DatasetRepository:
     return repo
 
 
-def get_dataset_service(settings: Settings | None = None) -> DatasetService:
+def get_dataset_service(
+    settings: Settings = Depends(get_settings),
+) -> DatasetService:
     """Return a DatasetService bound to the current settings."""
-    resolved = settings or get_settings()
-    repository = _dataset_repository(resolved.storage_dir)
+    repository = _dataset_repository(settings.storage_dir)
     return DatasetService(
         repository=repository,
-        max_size_bytes=resolved.max_upload_size_bytes,
+        max_size_bytes=settings.max_upload_size_bytes,
     )
 
 
-def get_eda_service(settings: Settings | None = None) -> EDAService:
+def get_eda_service(
+    settings: Settings = Depends(get_settings),
+) -> EDAService:
     """Return an EDAService bound to the current settings."""
-    resolved = settings or get_settings()
-    repository = _dataset_repository(resolved.storage_dir)
+    repository = _dataset_repository(settings.storage_dir)
     return EDAService(repository=repository)
 
 
-def get_cleaning_service(settings: Settings | None = None) -> CleaningService:
+def get_cleaning_service(
+    settings: Settings = Depends(get_settings),
+) -> CleaningService:
     """Return a CleaningService bound to the current settings."""
-    resolved = settings or get_settings()
-    repository = _dataset_repository(resolved.storage_dir)
+    repository = _dataset_repository(settings.storage_dir)
     return CleaningService(repository=repository)
