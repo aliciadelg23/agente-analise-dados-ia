@@ -75,6 +75,7 @@ A API sobe em `http://localhost:8000`.
 | `GET` | `/` | Informações da API (nome, versão, ambiente). |
 | `GET` | `/health` | Status de liveness. |
 | `POST` | `/datasets/upload` | Recebe um CSV, valida, persiste e retorna metadados. |
+| `GET` | `/datasets/{dataset_id}/summary` | Análise exploratória (EDA) do dataset armazenado. |
 
 ### Exemplos
 
@@ -100,6 +101,33 @@ curl -X POST http://localhost:8000/datasets/upload \
 #   "encoding": "utf-8",
 #   "separator": ","
 # }
+
+# Análise exploratória (EDA) do dataset
+curl http://localhost:8000/datasets/<dataset_id>/summary
+# {
+#   "dataset_id": "...",
+#   "rows": 1250,
+#   "columns": 18,
+#   "memory": "412.5 KB",
+#   "duplicates": 3,
+#   "null_counts": {"age": 12, "city": 0, ...},
+#   "null_percentages": {"age": 0.96, "city": 0.0, ...},
+#   "dtypes": {"age": "float64", "city": "object", ...},
+#   "numeric_columns": ["age", "salary"],
+#   "categorical_columns": ["city", "role"],
+#   "numeric_stats": {
+#     "age": {
+#       "mean": 32.4, "median": 30.0, "min": 18, "max": 65,
+#       "std": 8.7, "q25": 25.0, "q50": 30.0, "q75": 40.0
+#     }
+#   },
+#   "categorical_stats": {
+#     "city": {
+#       "unique_count": 42,
+#       "top_values": [{"value": "Lisbon", "count": 128}, ...]
+#     }
+#   }
+# }
 ```
 
 Documentação interativa gerada pelo FastAPI:
@@ -115,6 +143,18 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Análise exploratória (EDA)
+
+O endpoint `GET /datasets/{dataset_id}/summary` gera um resumo estatístico completo do dataset já enviado:
+
+- **Estrutura**: quantidade de linhas, colunas, uso de memória (string legível) e número de linhas duplicadas.
+- **Nulos**: contagem absoluta e percentual (0-100) por coluna.
+- **Tipos**: dtype Pandas por coluna, além das listas de colunas numéricas e categóricas.
+- **Estatísticas numéricas**: média, mediana, mínimo, máximo, desvio padrão (amostral, ddof=1) e quartis (Q1, Q2, Q3).
+- **Estatísticas categóricas**: número de valores únicos e os top 5 valores mais frequentes.
+
+Estatísticas ficam totalmente encapsuladas em `EDAService` (`app/services/eda_service.py`); a rota apenas delega. O CSV é lido do disco a cada chamada — sem cache neste momento.
 
 ## Qualidade
 
@@ -150,13 +190,14 @@ Etapas concluídas:
 
 1. **Etapa 1** — scaffolding da arquitetura, configuração base, logging, CI.
 2. **Etapa 2** — API FastAPI com endpoints `/`, `/health`, `/datasets/upload`, tratamento global de exceções, validação Pydantic e inspeção de CSV com Pandas (encoding, separador, tipos de coluna).
+3. **Etapa 3** — análise exploratória de dados (EDA) via `GET /datasets/{id}/summary`, com estatísticas descritivas para colunas numéricas e categóricas, contagem de nulos e duplicados.
 
 Próximas etapas planejadas:
 
-3. Configuração de provedores de LLM em `app/llms/`.
-4. Definição de contratos base para agentes em `app/agents/`.
-5. Primeiro pipeline de análise ponta a ponta.
-6. Persistência estruturada e camada de repositório sobre banco de dados.
+4. Configuração de provedores de LLM em `app/llms/`.
+5. Definição de contratos base para agentes em `app/agents/`.
+6. Primeiro pipeline de análise ponta a ponta.
+7. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
