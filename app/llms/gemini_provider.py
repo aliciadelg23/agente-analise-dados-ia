@@ -51,9 +51,7 @@ class GeminiProvider(LLMProvider):
 
         latest = remaining[-1]
         prompt_prefix = "\n\n".join(system_prompts)
-        latest_content = (
-            f"{prompt_prefix}\n\n{latest.content}" if prompt_prefix else latest.content
-        )
+        latest_content = f"{prompt_prefix}\n\n{latest.content}" if prompt_prefix else latest.content
 
         client = genai.GenerativeModel(chosen_model)
         chat_session = client.start_chat(history=history)

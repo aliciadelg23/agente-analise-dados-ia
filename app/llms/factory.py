@@ -7,7 +7,7 @@ providers is a matter of changing the env variable, not the code.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from app.config.settings import Settings, get_settings
 from app.core.exceptions import UnknownProviderError
@@ -59,7 +59,6 @@ def get_llm_provider(
     builder = _BUILDERS.get(provider_name)
     if builder is None:
         raise UnknownProviderError(
-            f"Unknown LLM provider '{provider_name}'. "
-            f"Available: {', '.join(sorted(_BUILDERS))}."
+            f"Unknown LLM provider '{provider_name}'. Available: {', '.join(sorted(_BUILDERS))}."
         )
     return builder(resolved_settings)
