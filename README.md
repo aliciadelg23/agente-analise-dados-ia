@@ -76,6 +76,7 @@ A API sobe em `http://localhost:8000`.
 | `GET` | `/health` | Status de liveness. |
 | `POST` | `/datasets/upload` | Recebe um CSV, valida, persiste e retorna metadados. |
 | `GET` | `/datasets/{dataset_id}/summary` | Análise exploratória (EDA) do dataset armazenado. |
+| `POST` | `/datasets/{dataset_id}/clean` | Limpa o dataset e persiste uma nova versão. |
 
 ### Exemplos
 
@@ -144,6 +145,69 @@ Documentação interativa gerada pelo FastAPI:
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
 
+### Data cleaning
+
+O endpoint `POST /datasets/{dataset_id}/clean` executa um pipeline configurável e persiste o resultado como **um novo dataset** — o original nunca é alterado.
+
+Passos aplicados (todos ativados por padrão; envie `false` no body para desligar):
+
+| Flag | O que faz |
+|------|-----------|
+| `standardize_column_names` | Normaliza nomes de colunas para snake_case ASCII (remove acentos, espaços e caracteres especiais). |
+| `strip_whitespace` | Remove espaços nas extremidades de colunas textuais; strings vazias viram nulos. |
+| `remove_empty_rows` | Remove linhas onde todos os valores são nulos. |
+| `remove_duplicates` | Remove linhas duplicadas. |
+| `convert_types` | Converte automaticamente `object` para numérico ou datetime quando todos os valores não-nulos convertem. |
+| `fill_nulls` | Preenche nulos: mediana para numéricas, moda para categóricas, primeiro valor observado para datetime; colunas 100% nulas são deixadas como estão. |
+
+Exemplo:
+
+```bash
+# Aplica todo o pipeline (body vazio ou {})
+curl -X POST http://localhost:8000/datasets/<dataset_id>/clean \
+  -H "content-type: application/json" \
+  -d '{}'
+
+# Apenas remove duplicados
+curl -X POST http://localhost:8000/datasets/<dataset_id>/clean \
+  -H "content-type: application/json" \
+  -d '{
+    "remove_duplicates": true,
+    "remove_empty_rows": false,
+    "fill_nulls": false,
+    "strip_whitespace": false,
+    "standardize_column_names": false,
+    "convert_types": false
+  }'
+```
+
+Resposta:
+
+```json
+{
+  "original_dataset_id": "...",
+  "cleaned_dataset_id": "...",
+  "report": {
+    "rows_before": 1250,
+    "rows_after": 1220,
+    "rows_removed": 30,
+    "duplicates_removed": 25,
+    "empty_rows_removed": 5,
+    "nulls_filled": {"age": 12, "city": 3},
+    "whitespace_stripped_columns": ["name", "email"],
+    "columns_renamed": {"Nome do Cliente": "nome_do_cliente"},
+    "types_converted": {"age": {"before": "object", "after": "int64"}},
+    "operations_applied": [
+      "standardize_column_names", "strip_whitespace",
+      "remove_empty_rows", "remove_duplicates",
+      "convert_types", "fill_nulls"
+    ]
+  }
+}
+```
+
+O `cleaned_dataset_id` retornado pode ser consultado pelos endpoints de summary como qualquer outro dataset.
+
 ### Análise exploratória (EDA)
 
 O endpoint `GET /datasets/{dataset_id}/summary` gera um resumo estatístico completo do dataset já enviado:
@@ -191,13 +255,14 @@ Etapas concluídas:
 1. **Etapa 1** — scaffolding da arquitetura, configuração base, logging, CI.
 2. **Etapa 2** — API FastAPI com endpoints `/`, `/health`, `/datasets/upload`, tratamento global de exceções, validação Pydantic e inspeção de CSV com Pandas (encoding, separador, tipos de coluna).
 3. **Etapa 3** — análise exploratória de dados (EDA) via `GET /datasets/{id}/summary`, com estatísticas descritivas para colunas numéricas e categóricas, contagem de nulos e duplicados.
+4. **Etapa 4** — data cleaning configurável via `POST /datasets/{id}/clean`: dedup, remoção de linhas vazias, strip de whitespace, padronização de nomes de coluna, conversão automática de tipos e preenchimento de nulos; salva o resultado como um novo dataset.
 
 Próximas etapas planejadas:
 
-4. Configuração de provedores de LLM em `app/llms/`.
-5. Definição de contratos base para agentes em `app/agents/`.
-6. Primeiro pipeline de análise ponta a ponta.
-7. Persistência estruturada e camada de repositório sobre banco de dados.
+5. Configuração de provedores de LLM em `app/llms/`.
+6. Definição de contratos base para agentes em `app/agents/`.
+7. Primeiro pipeline de análise ponta a ponta.
+8. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
