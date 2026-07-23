@@ -29,11 +29,7 @@ class MLNode:
             return {"ml_result": None}
 
         dataset_id = state.get("cleaned_dataset_id") or state["dataset_id"]
-        request = TrainRequest(
-            target_column=target, problem_type=ProblemType(problem_type)
-        )
+        request = TrainRequest(target_column=target, problem_type=ProblemType(problem_type))
         response = self._service.train(dataset_id, request)
-        logger.info(
-            "ML node trained on %s (chosen=%s)", dataset_id, response.chosen_algorithm
-        )
+        logger.info("ML node trained on %s (chosen=%s)", dataset_id, response.chosen_algorithm)
         return {"ml_result": response.model_dump(mode="json")}

@@ -27,9 +27,7 @@ class PlannerAgent:
 
         notes_parts: list[str] = []
         if problem_type is not None and problem_type not in _SUPPORTED_PROBLEM_TYPES:
-            notes_parts.append(
-                f"Unsupported problem_type '{problem_type}'; skipping ML."
-            )
+            notes_parts.append(f"Unsupported problem_type '{problem_type}'; skipping ML.")
             problem_type = None
             should_train = False
 
@@ -38,9 +36,7 @@ class PlannerAgent:
             should_train = False
 
         if should_train and not problem_type:
-            notes_parts.append(
-                "No problem_type provided; defaulting to 'classification'."
-            )
+            notes_parts.append("No problem_type provided; defaulting to 'classification'.")
             problem_type = "classification"
 
         plan: WorkflowPlan = {
