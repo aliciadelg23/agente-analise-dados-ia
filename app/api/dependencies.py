@@ -13,10 +13,12 @@ from fastapi import Depends
 
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
+from app.repositories.model_repository import ModelRepository
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
+from app.services.ml_pipeline_service import MLPipelineService
 
 
 @lru_cache(maxsize=1)
@@ -64,3 +66,19 @@ def get_chart_service(
         charts_dir=charts_dir,
         url_prefix=settings.charts_static_url_prefix,
     )
+
+
+@lru_cache(maxsize=1)
+def _model_repository(base_dir: str, subdir: str) -> ModelRepository:
+    repo = ModelRepository(Path(base_dir) / subdir)
+    repo.ensure_ready()
+    return repo
+
+
+def get_ml_pipeline_service(
+    settings: Settings = Depends(get_settings),
+) -> MLPipelineService:
+    """Return an MLPipelineService bound to the current settings."""
+    dataset_repo = _dataset_repository(settings.storage_dir)
+    model_repo = _model_repository(settings.storage_dir, settings.models_dir_name)
+    return MLPipelineService(dataset_repository=dataset_repo, model_repository=model_repo)

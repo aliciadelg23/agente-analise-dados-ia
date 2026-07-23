@@ -11,15 +11,18 @@ from app.api.dependencies import (
     get_cleaning_service,
     get_dataset_service,
     get_eda_service,
+    get_ml_pipeline_service,
 )
 from app.models.charts import DatasetChartsResponse
 from app.models.cleaning import CleaningOptions, DatasetCleanResponse
 from app.models.dataset import DatasetUploadResponse
 from app.models.eda import DatasetSummaryResponse
+from app.models.ml import TrainRequest, TrainResponse
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
+from app.services.ml_pipeline_service import MLPipelineService
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
@@ -86,3 +89,23 @@ async def get_dataset_charts(
     and category distributions in PNG (matplotlib) and HTML (plotly).
     """
     return service.generate(dataset_id)
+
+
+@router.post(
+    "/{dataset_id}/train",
+    response_model=TrainResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Train ML models on a stored dataset",
+)
+async def train_dataset(
+    dataset_id: UUID = Path(..., description="Source dataset identifier."),
+    request: TrainRequest = ...,
+    service: MLPipelineService = Depends(get_ml_pipeline_service),
+) -> TrainResponse:
+    """Train supported candidates, pick the best by CV score, persist it.
+
+    Classification runs LogisticRegression, DecisionTree and
+    RandomForest; regression runs LinearRegression and
+    RandomForestRegressor.
+    """
+    return service.train(dataset_id, request)
