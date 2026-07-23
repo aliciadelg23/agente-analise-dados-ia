@@ -100,3 +100,24 @@ class ExplainabilityError(MLError):
 
     status_code = 500
     code = "explainability_error"
+
+
+class LLMError(AppError):
+    """Base for errors raised by the LLM layer."""
+
+    status_code = 500
+    code = "llm_error"
+
+
+class UnknownProviderError(LLMError):
+    """Requested LLM provider is not registered."""
+
+    status_code = 400
+    code = "unknown_llm_provider"
+
+
+class MissingCredentialsError(LLMError):
+    """Provider is enabled but its API key is not configured."""
+
+    status_code = 400
+    code = "missing_llm_credentials"
