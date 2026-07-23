@@ -81,6 +81,7 @@ A API sobe em `http://localhost:8000`.
 | `POST` | `/datasets/{dataset_id}/train` | Treina modelos de ML e retorna métricas + modelo escolhido. |
 | `GET` | `/models/{model_id}/explain` | Explicabilidade: feature importance, SHAP e gráfico. |
 | `POST` | `/datasets/{dataset_id}/insights` | Insights gerados por LLM sobre o dataset (resumo, anomalias, sugestões, riscos). |
+| `POST` | `/agent/chat` | Agente LangChain com acesso a 5 ferramentas (dataset, EDA, estatísticas, ML, gráficos). |
 
 ### Exemplos
 
@@ -148,6 +149,62 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Agente LangChain
+
+O endpoint `POST /agent/chat` expõe um agente LangChain (`create_agent`, LangChain 1.x) que decide autonomamente quais ferramentas invocar para responder uma pergunta em linguagem natural.
+
+**Ferramentas disponíveis** (em `app/agents/tools.py`):
+
+| Nome | O que faz |
+|------|-----------|
+| `dataset_info` | Confirma que um `dataset_id` existe e retorna metadados básicos (path, size). |
+| `dataset_summary` | Roda o EDA completo (mesmo do endpoint da Etapa 3). |
+| `column_statistics` | Retorna estatísticas focadas em uma coluna específica (numérica ou categórica). |
+| `train_model` | Dispara o pipeline de ML da Etapa 6 e retorna as métricas dos candidatos. |
+| `generate_charts` | Gera o conjunto de gráficos da Etapa 5 e retorna as URLs. |
+
+Cada ferramenta valida seus inputs via Pydantic e retorna uma string JSON — formato que os agentes LangChain esperam. Erros das ferramentas viram JSON também (`{"error": {"code": ..., "message": ...}}`), então uma falha nunca quebra o loop do agente.
+
+**LLM utilizado**: `ChatOpenAI` (`langchain-openai`). Configurável via `OPENAI_API_KEY` e `OPENAI_MODEL` do `.env`. O prompt system pede ao modelo que use as ferramentas antes de responder.
+
+**Request**:
+
+```json
+{
+  "query": "Qual coluna tem mais valores nulos no dataset 5c1a...?",
+  "model": "gpt-4o-mini"
+}
+```
+
+- `query` — obrigatório, pergunta em linguagem natural.
+- `model` — opcional, sobrescreve `OPENAI_MODEL`.
+
+**Response**:
+
+```json
+{
+  "output": "A coluna 'email' tem 12% de valores nulos, seguida por 'salary' com 3%.",
+  "model": "gpt-4o-mini"
+}
+```
+
+**Erros**:
+
+- `400 missing_llm_credentials` — `OPENAI_API_KEY` ausente.
+
+Exemplo:
+
+```bash
+curl -X POST http://localhost:8000/agent/chat \
+  -H "content-type: application/json" \
+  -d '{"query": "Faça um resumo do dataset 5c1a-... e liste 3 riscos de qualidade de dados."}'
+```
+
+**Notas**:
+
+- O agente pode encadear múltiplas ferramentas para responder — por exemplo, chamar `dataset_info` para confirmar o id, `dataset_summary` para obter EDA, e voltar ao LLM para escrever a resposta.
+- Nenhuma chamada real ao OpenAI é feita nos testes automatizados (todos os testes mockam `ChatOpenAI` e `create_agent`).
 
 ### Insights gerados por LLM
 
@@ -577,10 +634,10 @@ Etapas concluídas:
 7. **Etapa 7** — explicabilidade via `GET /models/{id}/explain`: feature importance do estimador, SHAP values com explainer escolhido pelo tipo do modelo, summary plot em PNG e narrativa curta.
 8. **Etapa 8** — camada de abstração de LLMs em `app/llms/`: interface comum (`LLMProvider`), providers para OpenAI, Anthropic e Google Gemini, factory por nome, configuração via `.env`, sem endpoint HTTP nesta etapa.
 9. **Etapa 9** — insights gerados por LLM via `POST /datasets/{id}/insights`: EDA feed ao modelo, resposta estruturada com resumo executivo, insights, anomalias, sugestões e riscos; fallback para `raw_llm_response` quando o modelo não devolve JSON.
+10. **Etapa 10** — agente LangChain via `POST /agent/chat`: cinco ferramentas (`dataset_info`, `dataset_summary`, `column_statistics`, `train_model`, `generate_charts`) e um agente `create_agent` (LangChain 1.x) sobre `ChatOpenAI` capaz de encadear as chamadas para responder em linguagem natural.
 
 Próximas etapas planejadas:
 
-10. Definição de contratos base para agentes em `app/agents/`.
 11. Primeiro pipeline de análise ponta a ponta.
 12. Persistência estruturada e camada de repositório sobre banco de dados.
 
