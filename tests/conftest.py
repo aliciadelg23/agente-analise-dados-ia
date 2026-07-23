@@ -15,6 +15,7 @@ from app.api.dependencies import (
     get_cleaning_service,
     get_dataset_service,
     get_eda_service,
+    get_explainability_service,
     get_ml_pipeline_service,
 )
 from app.config.settings import get_settings
@@ -25,6 +26,7 @@ from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
+from app.services.explainability_service import ExplainabilityService
 from app.services.ml_pipeline_service import MLPipelineService
 
 
@@ -91,6 +93,21 @@ def ml_pipeline_service(
 
 
 @pytest.fixture
+def explainability_service(
+    dataset_repository: DatasetRepository,
+    model_repository: ModelRepository,
+    temp_storage: Path,
+) -> ExplainabilityService:
+    """Build an ExplainabilityService pointing at isolated repositories."""
+    return ExplainabilityService(
+        dataset_repository=dataset_repository,
+        model_repository=model_repository,
+        charts_dir=temp_storage / "charts",
+        url_prefix="/static/charts",
+    )
+
+
+@pytest.fixture
 def client(temp_storage: Path) -> Iterator[TestClient]:
     """FastAPI test client with dataset storage swapped to a temp dir."""
     get_settings.cache_clear()
@@ -130,11 +147,24 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
         model_repo.ensure_ready()
         return MLPipelineService(dataset_repository=dataset_repo, model_repository=model_repo)
 
+    def _override_explain() -> ExplainabilityService:
+        dataset_repo = DatasetRepository(temp_storage)
+        dataset_repo.ensure_ready()
+        model_repo = ModelRepository(temp_storage / "models")
+        model_repo.ensure_ready()
+        return ExplainabilityService(
+            dataset_repository=dataset_repo,
+            model_repository=model_repo,
+            charts_dir=temp_storage / "charts",
+            url_prefix="/static/charts",
+        )
+
     app.dependency_overrides[get_dataset_service] = _override_dataset
     app.dependency_overrides[get_eda_service] = _override_eda
     app.dependency_overrides[get_cleaning_service] = _override_cleaning
     app.dependency_overrides[get_chart_service] = _override_charts
     app.dependency_overrides[get_ml_pipeline_service] = _override_ml
+    app.dependency_overrides[get_explainability_service] = _override_explain
     try:
         yield TestClient(app)
     finally:
@@ -143,6 +173,7 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
         app.dependency_overrides.pop(get_cleaning_service, None)
         app.dependency_overrides.pop(get_chart_service, None)
         app.dependency_overrides.pop(get_ml_pipeline_service, None)
+        app.dependency_overrides.pop(get_explainability_service, None)
         get_settings.cache_clear()
         _dataset_repository.cache_clear()
         _model_repository.cache_clear()

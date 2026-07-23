@@ -12,7 +12,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api.routes import datasets, health, info, models as models_routes
+from app.api.routes import datasets, health, info
+from app.api.routes import models as models_routes
 from app.config.settings import get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging, get_logger

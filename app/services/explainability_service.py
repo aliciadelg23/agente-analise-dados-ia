@@ -105,7 +105,8 @@ class ExplainabilityService:
         mean_abs = self._mean_abs_shap(shap_values)
         shap_summary = ShapSummary(
             mean_abs_values=[
-                ShapValueItem(feature=f, value=v) for f, v in self._sorted(transformed_names, mean_abs)
+                ShapValueItem(feature=f, value=v)
+                for f, v in self._sorted(transformed_names, mean_abs)
             ],
             chart_url=chart_url,
         )
@@ -160,10 +161,7 @@ class ExplainabilityService:
             values = np.asarray(estimator.feature_importances_, dtype=float)
         elif hasattr(estimator, "coef_"):
             coef = np.asarray(estimator.coef_, dtype=float)
-            if coef.ndim > 1:
-                coef = np.mean(np.abs(coef), axis=0)
-            else:
-                coef = np.abs(coef)
+            coef = np.mean(np.abs(coef), axis=0) if coef.ndim > 1 else np.abs(coef)
             values = coef
         else:
             values = np.zeros(len(names), dtype=float)

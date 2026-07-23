@@ -39,9 +39,7 @@ class TopFeature(BaseModel):
     importance: float | None = Field(
         default=None, description="Model-level importance (may be null for kernel explainers)."
     )
-    mean_abs_shap: float | None = Field(
-        default=None, description="Mean absolute SHAP magnitude."
-    )
+    mean_abs_shap: float | None = Field(default=None, description="Mean absolute SHAP magnitude.")
 
 
 class ExplainabilityResponse(BaseModel):
