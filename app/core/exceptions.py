@@ -86,3 +86,17 @@ class InsufficientDataError(MLError):
 
     status_code = 422
     code = "insufficient_data"
+
+
+class ModelNotFoundError(MLError):
+    """Model id does not match any persisted model."""
+
+    status_code = 404
+    code = "model_not_found"
+
+
+class ExplainabilityError(MLError):
+    """Explainability computation failed."""
+
+    status_code = 500
+    code = "explainability_error"
