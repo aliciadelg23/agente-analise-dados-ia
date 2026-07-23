@@ -20,6 +20,9 @@ dependencies = [
     "scikit-learn>=1.5",
     "joblib>=1.4",
     "shap>=0.45",
+    "openai>=1.50",
+    "anthropic>=0.40",
+    "google-generativeai>=0.8",
 ]
 
 [dependency-groups]
