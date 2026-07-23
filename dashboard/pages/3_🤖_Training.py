@@ -5,12 +5,20 @@ from __future__ import annotations
 import streamlit as st
 
 from dashboard.api_client import APIError
-from dashboard.theme import apply_page_config, get_api_client, require_dataset_id, show_error
+from dashboard.i18n import t
+from dashboard.theme import (
+    apply_page_config,
+    get_api_client,
+    render_settings_sidebar,
+    require_dataset_id,
+    show_error,
+)
 
-apply_page_config("Training - Dashboard")
+apply_page_config()
+render_settings_sidebar()
 
-st.title("Treinamento de modelos")
-st.caption("Dispara o pipeline de ML e mostra as metricas dos candidatos.")
+st.title(t("training_title"))
+st.caption(t("training_caption"))
 
 dataset_id = require_dataset_id()
 if dataset_id is None:
@@ -18,11 +26,11 @@ if dataset_id is None:
 
 client = get_api_client()
 
-with st.spinner("Carregando colunas..."):
+with st.spinner(t("loading_columns")):
     try:
         summary = client.summary(dataset_id)
     except APIError as exc:
-        st.error(f"API retornou {exc.status_code}: {exc.message}")
+        st.error(f"{t('api_error')} ({exc.status_code}): {exc.message}")
         st.stop()
     except Exception as exc:
         show_error(exc)
@@ -31,12 +39,12 @@ with st.spinner("Carregando colunas..."):
 columns = list((summary.get("dtypes") or {}).keys())
 
 with st.form("training-form"):
-    target = st.selectbox("Coluna alvo (target)", options=columns)
-    problem_type = st.selectbox("Tipo de problema", ["classification", "regression"])
+    target = st.selectbox(t("target_column"), options=columns)
+    problem_type = st.selectbox(t("problem_type"), ["classification", "regression"])
     col_test, col_cv = st.columns(2)
-    test_size = col_test.slider("Test size", 0.05, 0.5, 0.2, 0.05)
-    cv_folds = col_cv.slider("CV folds", 2, 10, 5)
-    submitted = st.form_submit_button("Treinar")
+    test_size = col_test.slider(t("test_size"), 0.05, 0.5, 0.2, 0.05)
+    cv_folds = col_cv.slider(t("cv_folds"), 2, 10, 5)
+    submitted = st.form_submit_button(t("train_button"))
 
 if submitted and target:
     body = {
@@ -45,27 +53,28 @@ if submitted and target:
         "test_size": test_size,
         "cv_folds": cv_folds,
     }
-    with st.spinner("Treinando... isso pode levar alguns segundos"):
+    with st.spinner(t("training_running")):
         try:
             result = client.train(dataset_id, body)
         except APIError as exc:
-            st.error(f"API retornou {exc.status_code}: {exc.message}")
+            st.error(f"{t('api_error')} ({exc.status_code}): {exc.message}")
             st.stop()
         except Exception as exc:
             show_error(exc)
             st.stop()
 
     st.session_state["model_id"] = result.get("model_id")
-    st.success(f"Vencedor: **{result.get('chosen_algorithm')}**")
+    st.success(f"{t('winner')}: **{result.get('chosen_algorithm')}**")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Amostras (train)", result.get("n_samples_train", "?"))
-    col2.metric("Amostras (test)", result.get("n_samples_test", "?"))
+    col1.metric(t("samples_train"), result.get("n_samples_train", "?"))
+    col2.metric(t("samples_test"), result.get("n_samples_test", "?"))
     col3.metric(
-        "Model ID", result.get("model_id", "?")[:8] + "..." if result.get("model_id") else "?"
+        t("model_id"),
+        result.get("model_id", "?")[:8] + "..." if result.get("model_id") else "?",
     )
 
-    st.markdown("**Metricas dos candidatos**")
+    st.markdown(f"**{t('candidate_metrics')}**")
     candidates = result.get("candidates") or []
     if candidates:
         rows = []
@@ -83,7 +92,4 @@ if submitted and target:
             rows.append(row)
         st.dataframe(rows, hide_index=True, use_container_width=True)
 
-    st.caption(
-        f"Modelo salvo em `{result.get('model_uri', '?')}`. "
-        f"Use a pagina **Explanations** com o Model ID acima para inspecionar."
-    )
+    st.caption(f"{t('model_saved_at')} `{result.get('model_uri', '?')}`")
