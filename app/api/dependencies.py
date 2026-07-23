@@ -13,6 +13,7 @@ from fastapi import Depends
 
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
+from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
@@ -50,3 +51,16 @@ def get_cleaning_service(
     """Return a CleaningService bound to the current settings."""
     repository = _dataset_repository(settings.storage_dir)
     return CleaningService(repository=repository)
+
+
+def get_chart_service(
+    settings: Settings = Depends(get_settings),
+) -> ChartService:
+    """Return a ChartService bound to the current settings."""
+    repository = _dataset_repository(settings.storage_dir)
+    charts_dir = Path(settings.storage_dir) / "charts"
+    return ChartService(
+        repository=repository,
+        charts_dir=charts_dir,
+        url_prefix=settings.charts_static_url_prefix,
+    )

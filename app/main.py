@@ -6,7 +6,10 @@ alternative deployments can build a fresh instance with overrides.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api.routes import datasets, health, info
@@ -37,6 +40,14 @@ def create_app() -> FastAPI:
     app.include_router(info.router)
     app.include_router(health.router)
     app.include_router(datasets.router)
+
+    charts_dir = Path(settings.storage_dir) / "charts"
+    charts_dir.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        settings.charts_static_url_prefix,
+        StaticFiles(directory=charts_dir),
+        name="charts",
+    )
 
     return app
 

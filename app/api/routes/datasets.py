@@ -7,13 +7,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Path, UploadFile, status
 
 from app.api.dependencies import (
+    get_chart_service,
     get_cleaning_service,
     get_dataset_service,
     get_eda_service,
 )
+from app.models.charts import DatasetChartsResponse
 from app.models.cleaning import CleaningOptions, DatasetCleanResponse
 from app.models.dataset import DatasetUploadResponse
 from app.models.eda import DatasetSummaryResponse
+from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
@@ -68,3 +71,18 @@ async def clean_dataset(
     other dataset endpoints.
     """
     return service.clean(dataset_id, options or CleaningOptions())
+
+
+@router.get(
+    "/{dataset_id}/charts",
+    response_model=DatasetChartsResponse,
+    summary="Generate exploratory charts for a stored dataset",
+)
+async def get_dataset_charts(
+    dataset_id: UUID = Path(..., description="Source dataset identifier."),
+    service: ChartService = Depends(get_chart_service),
+) -> DatasetChartsResponse:
+    """Render histograms, boxplots, correlation heatmap, bar charts,
+    and category distributions in PNG (matplotlib) and HTML (plotly).
+    """
+    return service.generate(dataset_id)
