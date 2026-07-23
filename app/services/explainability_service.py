@@ -92,11 +92,11 @@ class ExplainabilityService:
             transformed_names = self._transformed_feature_names(pipeline, features)
             x_transformed = self._transform(pipeline, x_df)
             importance = self._feature_importance(estimator, transformed_names)
-            shap_values = self._compute_shap(
+            shap_values, shap_sample = self._compute_shap(
                 estimator, x_transformed, transformed_names, manifest.get("problem_type", "")
             )
             chart_url = self._render_summary_plot(
-                model_id, x_transformed, shap_values, transformed_names
+                model_id, shap_sample, shap_values, transformed_names
             )
         except (ValueError, RuntimeError, TypeError) as exc:
             logger.exception("Failed to compute explainability for model %s", model_id)
@@ -175,7 +175,12 @@ class ExplainabilityService:
         x_transformed: np.ndarray,
         names: list[str],
         problem_type: str,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return the SHAP matrix together with the sample it was computed on.
+
+        Callers must plot against the returned sample, not the original
+        ``x_transformed``, otherwise the row counts diverge.
+        """
         sample = self._sample(x_transformed, _MAX_SHAP_ROWS)
         background = self._sample(x_transformed, _MAX_BACKGROUND_ROWS)
 
@@ -192,7 +197,8 @@ class ExplainabilityService:
                 explainer = shap.KernelExplainer(predict, background)
                 values = explainer.shap_values(sample, nsamples=100, silent=True)
 
-        return self._coerce_shap_shape(values, sample.shape, problem_type)
+        coerced = self._coerce_shap_shape(values, sample.shape, problem_type)
+        return coerced, sample
 
     def _coerce_shap_shape(
         self, values: object, sample_shape: tuple[int, int], problem_type: str
