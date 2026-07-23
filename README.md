@@ -77,6 +77,7 @@ A API sobe em `http://localhost:8000`.
 | `POST` | `/datasets/upload` | Recebe um CSV, valida, persiste e retorna metadados. |
 | `GET` | `/datasets/{dataset_id}/summary` | Análise exploratória (EDA) do dataset armazenado. |
 | `POST` | `/datasets/{dataset_id}/clean` | Limpa o dataset e persiste uma nova versão. |
+| `GET` | `/datasets/{dataset_id}/charts` | Gera gráficos (histograma, boxplot, heatmap, barras, distribuição). |
 
 ### Exemplos
 
@@ -144,6 +145,58 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Visualizações automáticas
+
+O endpoint `GET /datasets/{dataset_id}/charts` renderiza cinco tipos de gráficos exploratórios em **dois formatos por gráfico**:
+
+- **PNG estático** com matplotlib (backend Agg, sem GUI).
+- **HTML interativo** com plotly (zoom, hover, tooltips; `plotly.js` via CDN).
+
+Os arquivos são gravados em `storage/charts/{dataset_id}/` e servidos como estáticos sob o prefixo configurável `CHARTS_STATIC_URL_PREFIX` (default `/static/charts`).
+
+| Grupo | Origem | Formato |
+|-------|--------|---------|
+| `histograms` | Uma imagem por coluna numérica. | PNG + HTML |
+| `boxplots` | Uma imagem por coluna numérica. | PNG + HTML |
+| `correlation_heatmap` | Matriz de correlação de Pearson entre colunas numéricas (nulo se `<2` colunas numéricas). | PNG + HTML |
+| `bar_charts` | Top 10 valores mais frequentes por coluna categórica. | PNG + HTML |
+| `category_distributions` | Bar chart agregado com o número de valores únicos por coluna categórica (nulo se não houver colunas categóricas). | PNG + HTML |
+
+Exemplo:
+
+```bash
+curl http://localhost:8000/datasets/<dataset_id>/charts
+```
+
+Resposta (resumida):
+
+```json
+{
+  "dataset_id": "...",
+  "charts": {
+    "histograms": [
+      {
+        "column": "age",
+        "png_url": "/static/charts/<id>/histogram_age.png",
+        "html_url": "/static/charts/<id>/histogram_age.html"
+      }
+    ],
+    "boxplots": [ ... ],
+    "correlation_heatmap": {
+      "png_url": "/static/charts/<id>/correlation_heatmap.png",
+      "html_url": "/static/charts/<id>/correlation_heatmap.html"
+    },
+    "bar_charts": [ ... ],
+    "category_distributions": {
+      "png_url": "/static/charts/<id>/category_distribution.png",
+      "html_url": "/static/charts/<id>/category_distribution.html"
+    }
+  }
+}
+```
+
+Chamar o endpoint novamente para o mesmo dataset **sobrescreve** os arquivos existentes (operação idempotente).
 
 ### Data cleaning
 
@@ -256,13 +309,14 @@ Etapas concluídas:
 2. **Etapa 2** — API FastAPI com endpoints `/`, `/health`, `/datasets/upload`, tratamento global de exceções, validação Pydantic e inspeção de CSV com Pandas (encoding, separador, tipos de coluna).
 3. **Etapa 3** — análise exploratória de dados (EDA) via `GET /datasets/{id}/summary`, com estatísticas descritivas para colunas numéricas e categóricas, contagem de nulos e duplicados.
 4. **Etapa 4** — data cleaning configurável via `POST /datasets/{id}/clean`: dedup, remoção de linhas vazias, strip de whitespace, padronização de nomes de coluna, conversão automática de tipos e preenchimento de nulos; salva o resultado como um novo dataset.
+5. **Etapa 5** — geração automática de visualizações via `GET /datasets/{id}/charts`: histogramas, boxplots, heatmap de correlação, gráficos de barras e distribuição de categorias, em PNG (matplotlib) e HTML interativo (plotly), servidos como estáticos.
 
 Próximas etapas planejadas:
 
-5. Configuração de provedores de LLM em `app/llms/`.
-6. Definição de contratos base para agentes em `app/agents/`.
-7. Primeiro pipeline de análise ponta a ponta.
-8. Persistência estruturada e camada de repositório sobre banco de dados.
+6. Configuração de provedores de LLM em `app/llms/`.
+7. Definição de contratos base para agentes em `app/agents/`.
+8. Primeiro pipeline de análise ponta a ponta.
+9. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
