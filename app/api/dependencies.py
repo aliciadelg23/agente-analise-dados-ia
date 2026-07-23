@@ -14,6 +14,7 @@ from fastapi import Depends
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
 from app.repositories.model_repository import ModelRepository
+from app.repositories.vector_repository import VectorRepository
 from app.services.ai_insight_service import AIInsightService
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
@@ -21,6 +22,7 @@ from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
 from app.services.explainability_service import ExplainabilityService
 from app.services.ml_pipeline_service import MLPipelineService
+from app.services.vector_index_service import VectorIndexService
 
 
 @lru_cache(maxsize=1)
@@ -106,3 +108,16 @@ def get_ai_insight_service(
 ) -> AIInsightService:
     """Return an AIInsightService bound to the current settings."""
     return AIInsightService(eda_service=eda)
+
+
+@lru_cache(maxsize=1)
+def _vector_repository(base_dir: str, subdir: str) -> VectorRepository:
+    return VectorRepository(Path(base_dir) / subdir)
+
+
+def get_vector_index_service(
+    settings: Settings = Depends(get_settings),
+) -> VectorIndexService:
+    """Return a VectorIndexService bound to the current settings."""
+    repository = _vector_repository(settings.storage_dir, settings.chromadb_dir_name)
+    return VectorIndexService(repository=repository)
