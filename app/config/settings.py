@@ -67,6 +67,11 @@ class Settings(BaseSettings):
         description="Default model for the Gemini provider.",
     )
 
+    chromadb_dir_name: str = Field(
+        default="chromadb",
+        description="Subdirectory under storage_dir where ChromaDB persists its data.",
+    )
+
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024

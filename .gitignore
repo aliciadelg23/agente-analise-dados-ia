@@ -74,3 +74,7 @@ storage/charts/*
 # Runtime models (keep the directory structure via .gitkeep)
 storage/models/*
 !storage/models/.gitkeep
+
+# Runtime chromadb (keep the directory structure via .gitkeep)
+storage/chromadb/*
+!storage/chromadb/.gitkeep
