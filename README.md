@@ -153,6 +153,59 @@ Documentação interativa gerada pelo FastAPI:
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
 
+### Docker
+
+Todo o stack roda em containers via `docker compose`. A mesma imagem serve API e dashboard — apenas o `command` muda.
+
+**Requisitos**: Docker Engine (>=24) e Docker Compose plugin (v2). Um `.env` pré-preenchido em `.env` (copie de `.env.example` e ajuste as chaves de LLM).
+
+**Subir tudo**:
+
+```bash
+cp .env.example .env
+# edite .env com suas chaves
+docker compose up -d --build
+```
+
+- API: `http://localhost:8000` (docs em `/docs`)
+- Dashboard: `http://localhost:8501`
+
+**Comandos úteis**:
+
+```bash
+docker compose ps           # status + healthchecks
+docker compose logs -f api  # logs em tempo real
+docker compose exec api uv run pytest  # rodar testes dentro do container
+docker compose down         # parar e remover containers
+```
+
+**Arquivos**:
+
+| Arquivo | Papel |
+|---------|-------|
+| `Dockerfile` | Imagem única. `python:3.12-slim` + `uv` (copiado da imagem oficial). Usuário não-root `app` (uid 1000). Camada de dependências separada da camada de código para melhor cache. |
+| `docker-compose.yml` | Serviços `api` e `dashboard`, volume em `./storage:/app/storage`, healthchecks via `curl`, `dashboard depends_on api` com condição `service_healthy`. |
+| `.dockerignore` | Exclui `.git`, `.venv`, caches, testes, docs, `.claude/`, storage runtime. |
+
+**Volumes** — `./storage:/app/storage` persiste:
+
+- `storage/uploads/` — CSVs enviados
+- `storage/charts/` — PNGs e HTMLs de gráficos
+- `storage/models/` — pipelines treinados (`.joblib` + `.json`)
+- `storage/chromadb/` — índice vetorial
+
+**Healthchecks**:
+
+- `api` → `GET /health` a cada 30s (3 retries, 20s de grace period)
+- `dashboard` → `GET /_stcore/health` (endpoint interno do Streamlit) com a mesma cadência
+
+**Variáveis de ambiente** — carregadas de `.env` via `env_file` no compose. Overrides pontuais:
+
+- `api` service: `APP_HOST=0.0.0.0`, `APP_PORT=8000`, `STORAGE_DIR=/app/storage`
+- `dashboard` service: `API_BASE_URL=http://api:8000` (DNS interno do Docker)
+
+**Nota sobre embeddings offline** — na primeira execução do endpoint vetorial, ChromaDB baixa o modelo ONNX (~79MB) para o cache do usuário `app` dentro do container. Para aquecer o cache antecipadamente, execute `docker compose exec api uv run python -c "from app.repositories.vector_repository import VectorRepository; VectorRepository('/tmp/warmup').upsert('dataset_eda', item_id='warm', document='hello', metadata={})"` uma vez após o primeiro `up`.
+
 ### Dashboard (Streamlit)
 
 Um dashboard multi-página em `dashboard/` consome a API via HTTP e expõe os principais fluxos em uma UI. Cada página é um arquivo dentro de `dashboard/pages/` — o Streamlit descobre e adiciona ao sidebar automaticamente.
@@ -783,10 +836,11 @@ Etapas concluídas:
 11. **Etapa 11** — workflow multi-agente com LangGraph via `POST /workflows/analyze`: seis agentes especializados (Planner, EDA, Cleaning, ML, Insights, Report) encadeados em um `StateGraph` linear com `WorkflowState` compartilhado; cada agente carrega uma responsabilidade única e é testado isoladamente.
 12. **Etapa 12** — banco vetorial com ChromaDB: quatro collections indexando EDA, insights, modelos e relatórios; `POST /vector/index/{dataset_id}` e `POST /vector/query` expõem indexação manual e busca semântica; o workflow da Etapa 11 alimenta o índice automaticamente.
 13. **Etapa 13** — dashboard Streamlit multi-página em `dashboard/`: Home + 6 páginas (Upload, Visualizations, Training, Insights, Chat, Explanations) consumindo a API via `dashboard/api_client.py`; tema dark configurado em `.streamlit/config.toml`; testes cobrindo o cliente HTTP.
+14. **Etapa 14** — dockerização completa: `Dockerfile` single-stage com uv e usuário não-root; `docker-compose.yml` com serviços `api` e `dashboard`, volume persistente para `storage/`, healthchecks via `curl`, `depends_on` entre serviços.
 
 Próximas etapas planejadas:
 
-14. Persistência estruturada e camada de repositório sobre banco de dados.
+15. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
