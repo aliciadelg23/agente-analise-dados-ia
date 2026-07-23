@@ -79,6 +79,7 @@ A API sobe em `http://localhost:8000`.
 | `POST` | `/datasets/{dataset_id}/clean` | Limpa o dataset e persiste uma nova versão. |
 | `GET` | `/datasets/{dataset_id}/charts` | Gera gráficos (histograma, boxplot, heatmap, barras, distribuição). |
 | `POST` | `/datasets/{dataset_id}/train` | Treina modelos de ML e retorna métricas + modelo escolhido. |
+| `GET` | `/models/{model_id}/explain` | Explicabilidade: feature importance, SHAP e gráfico. |
 
 ### Exemplos
 
@@ -146,6 +147,58 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Explicabilidade de modelos
+
+O endpoint `GET /models/{model_id}/explain` recarrega o pipeline treinado, aplica-o novamente ao dataset original e produz:
+
+- **Feature importance** — do próprio estimador:
+  - Modelos tree-based (RandomForest, DecisionTree) → `feature_importances_`
+  - Modelos lineares (Logistic/Linear Regression) → `|coef_|` (magnitude dos coeficientes)
+- **SHAP values** — explicações locais agregadas em magnitude média absoluta por feature:
+  - Tree-based → `shap.TreeExplainer` (rápido)
+  - Lineares → `shap.LinearExplainer`
+  - Fallback → `shap.KernelExplainer` com sample de 100 linhas de background
+- **Gráfico SHAP** — summary plot renderizado com matplotlib e salvo em `storage/charts/models/{model_id}/shap_summary.png`, servido via prefixo estático já existente.
+- **Top features** — visão consolidada combinando importância e SHAP em uma única lista (top 10).
+- **Narrativa** — texto curto em inglês listando as principais variáveis do modelo.
+
+Para classificação binária a SHAP é computada sobre a classe positiva; para multiclass, retornamos a média das magnitudes absolutas entre classes.
+
+Exemplo:
+
+```bash
+curl http://localhost:8000/models/<model_id>/explain
+```
+
+Resposta (resumida):
+
+```json
+{
+  "model_id": "...",
+  "dataset_id": "...",
+  "algorithm": "random_forest",
+  "problem_type": "classification",
+  "target_column": "churn",
+  "feature_importance": [
+    {"feature": "num__salary", "importance": 0.42},
+    {"feature": "num__age", "importance": 0.31}
+  ],
+  "shap": {
+    "mean_abs_values": [
+      {"feature": "num__salary", "value": 0.35},
+      {"feature": "num__age", "value": 0.22}
+    ],
+    "chart_url": "/static/charts/models/<model_id>/shap_summary.png"
+  },
+  "top_features": [
+    {"feature": "num__salary", "importance": 0.42, "mean_abs_shap": 0.35}
+  ],
+  "narrative": "The model relies primarily on 'num__salary', 'num__age'..."
+}
+```
+
+Nomes de features vêm com o prefixo aplicado pelo `ColumnTransformer` (`num__` para numéricas escalonadas, `cat__` para categóricas one-hot).
 
 ### Machine Learning
 
@@ -400,13 +453,14 @@ Etapas concluídas:
 4. **Etapa 4** — data cleaning configurável via `POST /datasets/{id}/clean`: dedup, remoção de linhas vazias, strip de whitespace, padronização de nomes de coluna, conversão automática de tipos e preenchimento de nulos; salva o resultado como um novo dataset.
 5. **Etapa 5** — geração automática de visualizações via `GET /datasets/{id}/charts`: histogramas, boxplots, heatmap de correlação, gráficos de barras e distribuição de categorias, em PNG (matplotlib) e HTML interativo (plotly), servidos como estáticos.
 6. **Etapa 6** — pipeline de Machine Learning via `POST /datasets/{id}/train`: classificação (LogisticRegression, DecisionTree, RandomForest) e regressão (LinearRegression, RandomForestRegressor), com pré-processamento automático (imputação, encoding, escalonamento), cross-validation, seleção do vencedor e persistência do pipeline treinado em joblib.
+7. **Etapa 7** — explicabilidade via `GET /models/{id}/explain`: feature importance do estimador, SHAP values com explainer escolhido pelo tipo do modelo, summary plot em PNG e narrativa curta.
 
 Próximas etapas planejadas:
 
-7. Configuração de provedores de LLM em `app/llms/`.
-8. Definição de contratos base para agentes em `app/agents/`.
-9. Primeiro pipeline de análise ponta a ponta.
-10. Persistência estruturada e camada de repositório sobre banco de dados.
+8. Configuração de provedores de LLM em `app/llms/`.
+9. Definição de contratos base para agentes em `app/agents/`.
+10. Primeiro pipeline de análise ponta a ponta.
+11. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
