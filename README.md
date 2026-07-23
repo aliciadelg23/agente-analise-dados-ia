@@ -148,6 +148,65 @@ Documentação interativa gerada pelo FastAPI:
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
 
+### Camada de LLMs
+
+O módulo `app/llms/` fornece uma abstração comum sobre três provedores (OpenAI, Anthropic e Google Gemini). A intenção é que agentes e serviços futuros dependam desta interface — nunca dos SDKs diretamente.
+
+**Estrutura**:
+
+```text
+app/llms/
+    base.py                 LLMProvider (ABC) + Message + LLMResponse
+    openai_provider.py      OpenAIProvider (OpenAI Chat Completions)
+    anthropic_provider.py   AnthropicProvider (Messages API)
+    gemini_provider.py      GeminiProvider (google-generativeai)
+    factory.py              get_llm_provider(name, settings)
+```
+
+**Interface**:
+
+```python
+from app.llms.base import Message
+from app.llms.factory import get_llm_provider
+
+provider = get_llm_provider()  # usa DEFAULT_LLM_PROVIDER
+response = provider.chat(
+    [
+        Message(role="system", content="Reply in English."),
+        Message(role="user", content="Hi."),
+    ],
+    model="gpt-4o-mini",  # opcional; usa <provider>_model do settings se omitido
+)
+print(response.content, response.usage)
+```
+
+**Configuração** (`.env`):
+
+```text
+DEFAULT_LLM_PROVIDER=openai
+
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o-mini
+
+ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+**Erros**:
+
+- `400 unknown_llm_provider` — nome não registrado no factory.
+- `400 missing_llm_credentials` — provider requisitado mas API key ausente.
+
+**Observações**:
+
+- Cada provider armazena internamente o cliente da SDK e traduz as mensagens no formato que o SDK espera. Vendor types não vazam para fora.
+- OpenAI e Anthropic aceitam `system` como role dedicada; Gemini não tem esse conceito, então a instrução system é concatenada na última mensagem `user`.
+- Tokens são reportados via `LLMResponse.usage` quando o SDK expõe (OpenAI e Anthropic; Gemini fica `null` por enquanto).
+- Streaming e embeddings ainda não estão implementados nesta etapa.
+
 ### Explicabilidade de modelos
 
 O endpoint `GET /models/{model_id}/explain` recarrega o pipeline treinado, aplica-o novamente ao dataset original e produz:
@@ -454,10 +513,10 @@ Etapas concluídas:
 5. **Etapa 5** — geração automática de visualizações via `GET /datasets/{id}/charts`: histogramas, boxplots, heatmap de correlação, gráficos de barras e distribuição de categorias, em PNG (matplotlib) e HTML interativo (plotly), servidos como estáticos.
 6. **Etapa 6** — pipeline de Machine Learning via `POST /datasets/{id}/train`: classificação (LogisticRegression, DecisionTree, RandomForest) e regressão (LinearRegression, RandomForestRegressor), com pré-processamento automático (imputação, encoding, escalonamento), cross-validation, seleção do vencedor e persistência do pipeline treinado em joblib.
 7. **Etapa 7** — explicabilidade via `GET /models/{id}/explain`: feature importance do estimador, SHAP values com explainer escolhido pelo tipo do modelo, summary plot em PNG e narrativa curta.
+8. **Etapa 8** — camada de abstração de LLMs em `app/llms/`: interface comum (`LLMProvider`), providers para OpenAI, Anthropic e Google Gemini, factory por nome, configuração via `.env`, sem endpoint HTTP nesta etapa.
 
 Próximas etapas planejadas:
 
-8. Configuração de provedores de LLM em `app/llms/`.
 9. Definição de contratos base para agentes em `app/agents/`.
 10. Primeiro pipeline de análise ponta a ponta.
 11. Persistência estruturada e camada de repositório sobre banco de dados.
