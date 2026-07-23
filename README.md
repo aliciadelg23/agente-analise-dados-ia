@@ -78,6 +78,7 @@ A API sobe em `http://localhost:8000`.
 | `GET` | `/datasets/{dataset_id}/summary` | Análise exploratória (EDA) do dataset armazenado. |
 | `POST` | `/datasets/{dataset_id}/clean` | Limpa o dataset e persiste uma nova versão. |
 | `GET` | `/datasets/{dataset_id}/charts` | Gera gráficos (histograma, boxplot, heatmap, barras, distribuição). |
+| `POST` | `/datasets/{dataset_id}/train` | Treina modelos de ML e retorna métricas + modelo escolhido. |
 
 ### Exemplos
 
@@ -145,6 +146,94 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Machine Learning
+
+O endpoint `POST /datasets/{dataset_id}/train` treina um conjunto fixo de algoritmos sobre um dataset já enviado e persiste o pipeline vencedor.
+
+**Request**:
+
+```json
+{
+  "target_column": "churn",
+  "problem_type": "classification",
+  "test_size": 0.2,
+  "cv_folds": 5
+}
+```
+
+- `target_column`: nome exato de uma coluna existente no dataset.
+- `problem_type`: `classification` ou `regression`.
+- `test_size` (opcional): fração das linhas para teste (default `0.2`).
+- `cv_folds` (opcional): folds da cross-validation (default `5`).
+
+**Candidatos avaliados**:
+
+| Tipo | Algoritmos |
+|------|------------|
+| `classification` | `logistic_regression`, `decision_tree`, `random_forest` |
+| `regression` | `linear_regression`, `random_forest` |
+
+**Pipeline aplicado** (via sklearn `Pipeline` + `ColumnTransformer`):
+
+1. Feature selection: descarta colunas com >90% de nulos ou (para categóricas) mais de 50 valores únicos.
+2. Numéricas: `SimpleImputer(median)` + `StandardScaler`.
+3. Categóricas: `SimpleImputer(most_frequent)` + `OneHotEncoder(handle_unknown="ignore")`.
+4. Split treino/teste (estratificado quando classification).
+5. Cross-validation em cada candidato usando `f1_weighted` (classification) ou `r2` (regression).
+6. Fit final no treino e avaliação no test set.
+7. Vencedor: candidato com maior média de score na CV.
+
+**Métricas retornadas** (`ModelMetrics`):
+
+- Classification: `accuracy`, `precision`, `recall`, `f1`, `roc_auc` (apenas binary com `predict_proba`).
+- Regression: `r2`, `mae`, `rmse`.
+
+Campos não aplicáveis vêm `null`.
+
+**Persistência**: o pipeline completo (preprocessador + estimador) é salvo em `storage/models/{model_id}.joblib` acompanhado de um manifest JSON com metadados (dataset, target, features, algoritmo escolhido).
+
+**Erros**:
+
+- `400 invalid_target_column` — coluna alvo não existe no dataset.
+- `422 insufficient_data` — menos de 10 linhas usáveis ou target de classificação com única classe.
+- `404 dataset_not_found` — dataset id inexistente.
+- `422 validation_error` — corpo inválido (ex.: `problem_type` fora do enum).
+
+Exemplo:
+
+```bash
+curl -X POST http://localhost:8000/datasets/<dataset_id>/train \
+  -H "content-type: application/json" \
+  -d '{"target_column": "churn", "problem_type": "classification"}'
+```
+
+Resposta (resumida):
+
+```json
+{
+  "dataset_id": "...",
+  "model_id": "...",
+  "problem_type": "classification",
+  "target_column": "churn",
+  "features": ["age", "salary", "city"],
+  "chosen_algorithm": "random_forest",
+  "n_samples_train": 120,
+  "n_samples_test": 30,
+  "candidates": [
+    {
+      "algorithm": "logistic_regression",
+      "cv_score_mean": 0.87,
+      "cv_score_std": 0.03,
+      "test_metrics": {"accuracy": 0.83, "precision": 0.82, "recall": 0.81, "f1": 0.81, "roc_auc": 0.91}
+    },
+    {"algorithm": "decision_tree", "...": "..."},
+    {"algorithm": "random_forest", "...": "..."}
+  ],
+  "best_metrics": {"accuracy": 0.90, "precision": 0.89, "recall": 0.90, "f1": 0.89, "roc_auc": 0.95},
+  "model_uri": "storage/models/<model_id>.joblib"
+}
+```
 
 ### Visualizações automáticas
 
@@ -310,13 +399,14 @@ Etapas concluídas:
 3. **Etapa 3** — análise exploratória de dados (EDA) via `GET /datasets/{id}/summary`, com estatísticas descritivas para colunas numéricas e categóricas, contagem de nulos e duplicados.
 4. **Etapa 4** — data cleaning configurável via `POST /datasets/{id}/clean`: dedup, remoção de linhas vazias, strip de whitespace, padronização de nomes de coluna, conversão automática de tipos e preenchimento de nulos; salva o resultado como um novo dataset.
 5. **Etapa 5** — geração automática de visualizações via `GET /datasets/{id}/charts`: histogramas, boxplots, heatmap de correlação, gráficos de barras e distribuição de categorias, em PNG (matplotlib) e HTML interativo (plotly), servidos como estáticos.
+6. **Etapa 6** — pipeline de Machine Learning via `POST /datasets/{id}/train`: classificação (LogisticRegression, DecisionTree, RandomForest) e regressão (LinearRegression, RandomForestRegressor), com pré-processamento automático (imputação, encoding, escalonamento), cross-validation, seleção do vencedor e persistência do pipeline treinado em joblib.
 
 Próximas etapas planejadas:
 
-6. Configuração de provedores de LLM em `app/llms/`.
-7. Definição de contratos base para agentes em `app/agents/`.
-8. Primeiro pipeline de análise ponta a ponta.
-9. Persistência estruturada e camada de repositório sobre banco de dados.
+7. Configuração de provedores de LLM em `app/llms/`.
+8. Definição de contratos base para agentes em `app/agents/`.
+9. Primeiro pipeline de análise ponta a ponta.
+10. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
