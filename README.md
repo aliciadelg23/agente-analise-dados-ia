@@ -80,6 +80,7 @@ A API sobe em `http://localhost:8000`.
 | `GET` | `/datasets/{dataset_id}/charts` | Gera gráficos (histograma, boxplot, heatmap, barras, distribuição). |
 | `POST` | `/datasets/{dataset_id}/train` | Treina modelos de ML e retorna métricas + modelo escolhido. |
 | `GET` | `/models/{model_id}/explain` | Explicabilidade: feature importance, SHAP e gráfico. |
+| `POST` | `/datasets/{dataset_id}/insights` | Insights gerados por LLM sobre o dataset (resumo, anomalias, sugestões, riscos). |
 
 ### Exemplos
 
@@ -147,6 +148,67 @@ Documentação interativa gerada pelo FastAPI:
 - Arquivos são salvos em `storage/uploads/{dataset_id}.csv` (diretório configurável via `STORAGE_DIR`).
 - O CSV é inspecionado com Pandas após o upload: detecção automática de encoding (utf-8, latin-1, ...), separador (`,` `;` `|` tab) e tipos de coluna.
 - Respostas de erro seguem o formato `{"error": {"code": "...", "message": "..."}}`.
+
+### Insights gerados por LLM
+
+O endpoint `POST /datasets/{dataset_id}/insights` combina a análise exploratória da Etapa 3 com a camada de LLMs da Etapa 8 para produzir uma análise em linguagem natural.
+
+**Fluxo interno**:
+
+1. `EDAService.summarize(dataset_id)` gera as estatísticas descritivas.
+2. A saída é serializada em JSON compacto.
+3. Uma mensagem system dita o formato de resposta obrigatório; uma mensagem user carrega o JSON da EDA.
+4. `LLMProvider.chat(...)` é chamado via o factory da camada de LLMs.
+5. O texto retornado é interpretado como JSON; se necessário, um regex extrai o bloco JSON de uma resposta "conversacional".
+
+**Request** (todos os campos opcionais):
+
+```json
+{
+  "provider": "anthropic",
+  "model": "claude-opus-4-8"
+}
+```
+
+- Body vazio (`{}`) → usa `DEFAULT_LLM_PROVIDER` e o modelo padrão do provider.
+- `provider` — sobrescreve o provider padrão. Valores aceitos: `openai`, `anthropic`, `gemini`.
+- `model` — sobrescreve o modelo do provider escolhido.
+
+**Response**:
+
+```json
+{
+  "dataset_id": "...",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "executive_summary": "Dataset has 1250 rows and 18 columns...",
+  "insights": [
+    "Age distribution is right-skewed with mean ~35 years.",
+    "Salary correlates positively with age (r=0.72)."
+  ],
+  "anomalies": ["Column 'email' has 12% nulls..."],
+  "suggestions": ["Drop 'internal_id' before training."],
+  "risks": ["Class imbalance in 'churn' may bias classifiers."],
+  "raw_llm_response": null
+}
+```
+
+Se o LLM retornar algo que não é JSON, `raw_llm_response` traz o texto bruto para debug e as listas ficam vazias — a rota **não** falha (segue com HTTP 201).
+
+**Erros**:
+
+- `404 dataset_not_found` — dataset inexistente.
+- `400 unknown_llm_provider` — nome do provider não registrado.
+- `400 missing_llm_credentials` — API key do provider ausente.
+- `500 llm_error` — falha da SDK do LLM.
+
+Exemplo:
+
+```bash
+curl -X POST http://localhost:8000/datasets/<dataset_id>/insights \
+  -H "content-type: application/json" \
+  -d '{}'
+```
 
 ### Camada de LLMs
 
@@ -514,12 +576,13 @@ Etapas concluídas:
 6. **Etapa 6** — pipeline de Machine Learning via `POST /datasets/{id}/train`: classificação (LogisticRegression, DecisionTree, RandomForest) e regressão (LinearRegression, RandomForestRegressor), com pré-processamento automático (imputação, encoding, escalonamento), cross-validation, seleção do vencedor e persistência do pipeline treinado em joblib.
 7. **Etapa 7** — explicabilidade via `GET /models/{id}/explain`: feature importance do estimador, SHAP values com explainer escolhido pelo tipo do modelo, summary plot em PNG e narrativa curta.
 8. **Etapa 8** — camada de abstração de LLMs em `app/llms/`: interface comum (`LLMProvider`), providers para OpenAI, Anthropic e Google Gemini, factory por nome, configuração via `.env`, sem endpoint HTTP nesta etapa.
+9. **Etapa 9** — insights gerados por LLM via `POST /datasets/{id}/insights`: EDA feed ao modelo, resposta estruturada com resumo executivo, insights, anomalias, sugestões e riscos; fallback para `raw_llm_response` quando o modelo não devolve JSON.
 
 Próximas etapas planejadas:
 
-9. Definição de contratos base para agentes em `app/agents/`.
-10. Primeiro pipeline de análise ponta a ponta.
-11. Persistência estruturada e camada de repositório sobre banco de dados.
+10. Definição de contratos base para agentes em `app/agents/`.
+11. Primeiro pipeline de análise ponta a ponta.
+12. Persistência estruturada e camada de repositório sobre banco de dados.
 
 ## Licença
 
