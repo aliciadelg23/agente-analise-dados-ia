@@ -62,3 +62,7 @@ logs/
 tmp/
 temp/
 scratch/
+
+# Runtime uploads (keep the directory structure via .gitkeep)
+storage/uploads/*
+!storage/uploads/.gitkeep

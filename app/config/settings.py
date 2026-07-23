@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     app_port: int = Field(default=8000, description="Bind port for the HTTP server.")
     log_level: str = Field(default="INFO", description="Root logger level.")
 
+    storage_dir: str = Field(
+        default="storage",
+        description="Base directory (relative to project root) for persisted artifacts.",
+    )
+    max_upload_size_mb: int = Field(
+        default=50,
+        ge=1,
+        description="Maximum accepted upload size in megabytes.",
+    )
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
