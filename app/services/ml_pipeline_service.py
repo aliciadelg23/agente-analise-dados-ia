@@ -179,8 +179,8 @@ class MLPipelineService:
             target_column=request.target_column,
             features=feature_columns,
             chosen_algorithm=best_name,
-            n_samples_train=int(len(x_train)),
-            n_samples_test=int(len(x_test)),
+            n_samples_train=len(x_train),
+            n_samples_test=len(x_test),
             candidates=candidates,
             best_metrics=best_result.test_metrics,
             model_uri=str(artifact_path),
@@ -206,9 +206,11 @@ class MLPipelineService:
             null_ratio = float(series.isna().sum()) / total if total else 1.0
             if null_ratio > _MAX_NULL_RATIO:
                 continue
-            if series.dtype.name in ("object", "str", "string", "category", "bool"):
-                if series.nunique(dropna=True) > _MAX_CATEGORICAL_UNIQUE:
-                    continue
+            if (
+                series.dtype.name in ("object", "str", "string", "category", "bool")
+                and series.nunique(dropna=True) > _MAX_CATEGORICAL_UNIQUE
+            ):
+                continue
             selected.append(str(column))
         return x[selected].copy(), selected
 

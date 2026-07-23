@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
-class ProblemType(str, Enum):
+class ProblemType(StrEnum):
     """Supported supervised learning problem types."""
 
     CLASSIFICATION = "classification"

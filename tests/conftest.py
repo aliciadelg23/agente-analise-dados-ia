@@ -10,18 +10,22 @@ from fastapi.testclient import TestClient
 
 from app.api.dependencies import (
     _dataset_repository,
+    _model_repository,
     get_chart_service,
     get_cleaning_service,
     get_dataset_service,
     get_eda_service,
+    get_ml_pipeline_service,
 )
 from app.config.settings import get_settings
 from app.main import app
 from app.repositories.dataset_repository import DatasetRepository
+from app.repositories.model_repository import ModelRepository
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
+from app.services.ml_pipeline_service import MLPipelineService
 
 
 @pytest.fixture
@@ -69,6 +73,24 @@ def chart_service(dataset_repository: DatasetRepository, temp_storage: Path) -> 
 
 
 @pytest.fixture
+def model_repository(temp_storage: Path) -> ModelRepository:
+    """Filesystem repository for trained models."""
+    repository = ModelRepository(temp_storage / "models")
+    repository.ensure_ready()
+    return repository
+
+
+@pytest.fixture
+def ml_pipeline_service(
+    dataset_repository: DatasetRepository, model_repository: ModelRepository
+) -> MLPipelineService:
+    """Build an MLPipelineService pointing at isolated repositories."""
+    return MLPipelineService(
+        dataset_repository=dataset_repository, model_repository=model_repository
+    )
+
+
+@pytest.fixture
 def client(temp_storage: Path) -> Iterator[TestClient]:
     """FastAPI test client with dataset storage swapped to a temp dir."""
     get_settings.cache_clear()
@@ -101,10 +123,18 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
             url_prefix="/static/charts",
         )
 
+    def _override_ml() -> MLPipelineService:
+        dataset_repo = DatasetRepository(temp_storage)
+        dataset_repo.ensure_ready()
+        model_repo = ModelRepository(temp_storage / "models")
+        model_repo.ensure_ready()
+        return MLPipelineService(dataset_repository=dataset_repo, model_repository=model_repo)
+
     app.dependency_overrides[get_dataset_service] = _override_dataset
     app.dependency_overrides[get_eda_service] = _override_eda
     app.dependency_overrides[get_cleaning_service] = _override_cleaning
     app.dependency_overrides[get_chart_service] = _override_charts
+    app.dependency_overrides[get_ml_pipeline_service] = _override_ml
     try:
         yield TestClient(app)
     finally:
@@ -112,5 +142,7 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
         app.dependency_overrides.pop(get_eda_service, None)
         app.dependency_overrides.pop(get_cleaning_service, None)
         app.dependency_overrides.pop(get_chart_service, None)
+        app.dependency_overrides.pop(get_ml_pipeline_service, None)
         get_settings.cache_clear()
         _dataset_repository.cache_clear()
+        _model_repository.cache_clear()
