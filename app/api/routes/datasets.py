@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Path, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Path, UploadFile, status
 
-from app.api.dependencies import get_dataset_service, get_eda_service
+from app.api.dependencies import (
+    get_cleaning_service,
+    get_dataset_service,
+    get_eda_service,
+)
+from app.models.cleaning import CleaningOptions, DatasetCleanResponse
 from app.models.dataset import DatasetUploadResponse
 from app.models.eda import DatasetSummaryResponse
+from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
 
@@ -42,3 +48,23 @@ async def get_dataset_summary(
 ) -> DatasetSummaryResponse:
     """Return descriptive statistics for the stored dataset."""
     return service.summarize(dataset_id)
+
+
+@router.post(
+    "/{dataset_id}/clean",
+    response_model=DatasetCleanResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Clean a dataset and store the result as a new version",
+)
+async def clean_dataset(
+    dataset_id: UUID = Path(..., description="Source dataset identifier."),
+    options: CleaningOptions = Body(default_factory=CleaningOptions),
+    service: CleaningService = Depends(get_cleaning_service),
+) -> DatasetCleanResponse:
+    """Run the cleaning pipeline and return the report plus the new id.
+
+    The original dataset is left untouched; the cleaned version is
+    stored under a fresh dataset id and can be queried by any of the
+    other dataset endpoints.
+    """
+    return service.clean(dataset_id, options)

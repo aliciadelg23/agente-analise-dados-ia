@@ -11,6 +11,7 @@ from pathlib import Path
 
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
+from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
 
@@ -37,3 +38,10 @@ def get_eda_service(settings: Settings | None = None) -> EDAService:
     resolved = settings or get_settings()
     repository = _dataset_repository(resolved.storage_dir)
     return EDAService(repository=repository)
+
+
+def get_cleaning_service(settings: Settings | None = None) -> CleaningService:
+    """Return a CleaningService bound to the current settings."""
+    resolved = settings or get_settings()
+    repository = _dataset_repository(resolved.storage_dir)
+    return CleaningService(repository=repository)
