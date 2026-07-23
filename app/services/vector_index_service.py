@@ -118,9 +118,7 @@ class VectorIndexService:
         }
         collection = mapping.get(type_filter)
         if collection is None:
-            raise ValueError(
-                f"Unknown type '{type_filter}'. Allowed: {', '.join(sorted(mapping))}"
-            )
+            raise ValueError(f"Unknown type '{type_filter}'. Allowed: {', '.join(sorted(mapping))}")
         return [collection]
 
     @staticmethod

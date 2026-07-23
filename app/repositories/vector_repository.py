@@ -69,7 +69,9 @@ class VectorRepository:
         for name in collections:
             target = self._get_collection(name)
             result = target.query(
-                query_texts=[query_text], n_results=max(1, top_k), include=["documents", "metadatas", "distances"]
+                query_texts=[query_text],
+                n_results=max(1, top_k),
+                include=["documents", "metadatas", "distances"],
             )
             ids = (result.get("ids") or [[]])[0]
             documents = (result.get("documents") or [[]])[0]
