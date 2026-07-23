@@ -1,0 +1,53 @@
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Tooling / metadata not needed at runtime
+.claude/
+.github/
+docs/
+plans/
+scripts/
+tests/
+
+# Runtime artifacts (persisted via volumes instead)
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/charts/*
+!storage/charts/.gitkeep
+storage/models/*
+!storage/models/.gitkeep
+storage/chromadb/*
+!storage/chromadb/.gitkeep
+
+# Logs and scratch
+*.log
+tmp/
+temp/
+scratch/
