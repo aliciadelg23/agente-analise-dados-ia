@@ -7,17 +7,21 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Path, UploadFile, status
 
 from app.api.dependencies import (
+    get_ai_insight_service,
     get_chart_service,
     get_cleaning_service,
     get_dataset_service,
     get_eda_service,
     get_ml_pipeline_service,
 )
+from app.llms.factory import get_llm_provider
 from app.models.charts import DatasetChartsResponse
 from app.models.cleaning import CleaningOptions, DatasetCleanResponse
 from app.models.dataset import DatasetUploadResponse
 from app.models.eda import DatasetSummaryResponse
+from app.models.insights import DatasetInsightsResponse, InsightsRequest
 from app.models.ml import TrainRequest, TrainResponse
+from app.services.ai_insight_service import AIInsightService
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
@@ -109,3 +113,23 @@ async def train_dataset(
     RandomForestRegressor.
     """
     return service.train(dataset_id, request)
+
+
+@router.post(
+    "/{dataset_id}/insights",
+    response_model=DatasetInsightsResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate AI-authored insights over a stored dataset",
+)
+async def generate_insights(
+    dataset_id: UUID = Path(..., description="Source dataset identifier."),
+    request: InsightsRequest | None = None,
+    service: AIInsightService = Depends(get_ai_insight_service),
+) -> DatasetInsightsResponse:
+    """Run EDA, ask the configured LLM for structured analysis.
+
+    Optional body fields override the default provider and/or model.
+    """
+    body = request or InsightsRequest()
+    provider = get_llm_provider(body.provider)
+    return service.analyze(dataset_id, provider, model=body.model)

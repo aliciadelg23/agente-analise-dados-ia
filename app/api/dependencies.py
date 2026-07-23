@@ -14,6 +14,7 @@ from fastapi import Depends
 from app.config.settings import Settings, get_settings
 from app.repositories.dataset_repository import DatasetRepository
 from app.repositories.model_repository import ModelRepository
+from app.services.ai_insight_service import AIInsightService
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
@@ -98,3 +99,10 @@ def get_explainability_service(
         charts_dir=charts_dir,
         url_prefix=settings.charts_static_url_prefix,
     )
+
+
+def get_ai_insight_service(
+    eda: EDAService = Depends(get_eda_service),
+) -> AIInsightService:
+    """Return an AIInsightService bound to the current settings."""
+    return AIInsightService(eda_service=eda)
