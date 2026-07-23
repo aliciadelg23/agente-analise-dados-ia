@@ -56,9 +56,7 @@ def _build_chat_model(
     if resolved_provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        return ChatGoogleGenerativeAI(
-            google_api_key=api_key, model=model, temperature=temperature
-        )
+        return ChatGoogleGenerativeAI(google_api_key=api_key, model=model, temperature=temperature)
 
     if resolved_provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
