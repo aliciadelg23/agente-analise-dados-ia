@@ -70,3 +70,7 @@ storage/uploads/*
 # Runtime charts (keep the directory structure via .gitkeep)
 storage/charts/*
 !storage/charts/.gitkeep
+
+# Runtime models (keep the directory structure via .gitkeep)
+storage/models/*
+!storage/models/.gitkeep

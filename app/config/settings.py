@@ -42,6 +42,10 @@ class Settings(BaseSettings):
         default="/static/charts",
         description="URL prefix under which generated charts are served.",
     )
+    models_dir_name: str = Field(
+        default="models",
+        description="Subdirectory under storage_dir where trained models are persisted.",
+    )
 
     @property
     def max_upload_size_bytes(self) -> int:
