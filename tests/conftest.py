@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from app.api.dependencies import (
     _dataset_repository,
     _model_repository,
+    get_ai_insight_service,
     get_chart_service,
     get_cleaning_service,
     get_dataset_service,
@@ -22,6 +23,7 @@ from app.config.settings import get_settings
 from app.main import app
 from app.repositories.dataset_repository import DatasetRepository
 from app.repositories.model_repository import ModelRepository
+from app.services.ai_insight_service import AIInsightService
 from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
@@ -159,12 +161,18 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
             url_prefix="/static/charts",
         )
 
+    def _override_insights() -> AIInsightService:
+        repository = DatasetRepository(temp_storage)
+        repository.ensure_ready()
+        return AIInsightService(eda_service=EDAService(repository=repository))
+
     app.dependency_overrides[get_dataset_service] = _override_dataset
     app.dependency_overrides[get_eda_service] = _override_eda
     app.dependency_overrides[get_cleaning_service] = _override_cleaning
     app.dependency_overrides[get_chart_service] = _override_charts
     app.dependency_overrides[get_ml_pipeline_service] = _override_ml
     app.dependency_overrides[get_explainability_service] = _override_explain
+    app.dependency_overrides[get_ai_insight_service] = _override_insights
     try:
         yield TestClient(app)
     finally:
@@ -174,6 +182,7 @@ def client(temp_storage: Path) -> Iterator[TestClient]:
         app.dependency_overrides.pop(get_chart_service, None)
         app.dependency_overrides.pop(get_ml_pipeline_service, None)
         app.dependency_overrides.pop(get_explainability_service, None)
+        app.dependency_overrides.pop(get_ai_insight_service, None)
         get_settings.cache_clear()
         _dataset_repository.cache_clear()
         _model_repository.cache_clear()

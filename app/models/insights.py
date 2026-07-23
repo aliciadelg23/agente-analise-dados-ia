@@ -35,9 +35,7 @@ class DatasetInsightsResponse(BaseModel):
     anomalies: list[str] = Field(
         default_factory=list, description="Suspicious rows, columns, or values."
     )
-    suggestions: list[str] = Field(
-        default_factory=list, description="Actionable next steps."
-    )
+    suggestions: list[str] = Field(default_factory=list, description="Actionable next steps.")
     risks: list[str] = Field(
         default_factory=list, description="Data-quality or modeling risks flagged by the model."
     )
