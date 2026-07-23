@@ -58,3 +58,31 @@ class DatasetNotFoundError(DatasetError):
 
     status_code = 404
     code = "dataset_not_found"
+
+
+class MLError(AppError):
+    """Base for errors raised by the ML pipeline."""
+
+    status_code = 400
+    code = "ml_error"
+
+
+class InvalidTargetColumnError(MLError):
+    """Requested target column does not exist in the dataset."""
+
+    status_code = 400
+    code = "invalid_target_column"
+
+
+class InvalidProblemTypeError(MLError):
+    """Problem type is not one of the supported values."""
+
+    status_code = 400
+    code = "invalid_problem_type"
+
+
+class InsufficientDataError(MLError):
+    """Dataset does not have enough rows or classes to train."""
+
+    status_code = 422
+    code = "insufficient_data"
