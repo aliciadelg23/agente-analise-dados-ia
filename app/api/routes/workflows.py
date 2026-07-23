@@ -17,6 +17,7 @@ from app.api.dependencies import (
     get_cleaning_service,
     get_eda_service,
     get_ml_pipeline_service,
+    get_vector_index_service,
 )
 from app.llms.factory import get_llm_provider
 from app.models.workflow import WorkflowAnalyzeRequest, WorkflowAnalyzeResponse
@@ -24,6 +25,7 @@ from app.services.ai_insight_service import AIInsightService
 from app.services.cleaning_service import CleaningService
 from app.services.eda_service import EDAService
 from app.services.ml_pipeline_service import MLPipelineService
+from app.services.vector_index_service import VectorIndexService
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -39,16 +41,19 @@ async def analyze(
     cleaning_service: CleaningService = Depends(get_cleaning_service),
     ml_service: MLPipelineService = Depends(get_ml_pipeline_service),
     insight_service: AIInsightService = Depends(get_ai_insight_service),
+    vector_service: VectorIndexService = Depends(get_vector_index_service),
 ) -> WorkflowAnalyzeResponse:
     """Execute planner -> eda -> cleaning -> ml -> insights -> report."""
     llm_provider = get_llm_provider(request.llm_provider)
 
     planner = PlannerAgent()
-    eda_node = EDANode(service=eda_service)
+    eda_node = EDANode(service=eda_service, vector_index=vector_service)
     cleaning_node = CleaningNode(service=cleaning_service)
-    ml_node = MLNode(service=ml_service)
-    insight_node = InsightNode(service=insight_service, llm_provider=llm_provider)
-    report_node = ReportNode(llm_provider=llm_provider)
+    ml_node = MLNode(service=ml_service, vector_index=vector_service)
+    insight_node = InsightNode(
+        service=insight_service, llm_provider=llm_provider, vector_index=vector_service
+    )
+    report_node = ReportNode(llm_provider=llm_provider, vector_index=vector_service)
 
     graph = build_workflow_graph(
         planner=planner,

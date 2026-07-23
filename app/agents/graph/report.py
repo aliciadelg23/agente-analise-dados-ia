@@ -7,6 +7,7 @@ import json
 from app.agents.graph.state import WorkflowState
 from app.core.logging import get_logger
 from app.llms.base import LLMProvider, Message
+from app.services.vector_index_service import VectorIndexService
 
 logger = get_logger(__name__)
 
@@ -23,8 +24,13 @@ _SYSTEM_PROMPT = (
 class ReportNode:
     """Ask the LLM to compose a markdown report from the collected state."""
 
-    def __init__(self, llm_provider: LLMProvider) -> None:
+    def __init__(
+        self,
+        llm_provider: LLMProvider,
+        vector_index: VectorIndexService | None = None,
+    ) -> None:
         self._llm = llm_provider
+        self._vector_index = vector_index
 
     def __call__(self, state: WorkflowState) -> WorkflowState:
         payload = {
@@ -48,4 +54,6 @@ class ReportNode:
             len(response.content),
             response.provider,
         )
+        if self._vector_index is not None:
+            self._vector_index.index_report(state["dataset_id"], response.content)
         return {"final_report": response.content}
