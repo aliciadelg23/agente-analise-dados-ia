@@ -9,8 +9,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app import __version__
-from app.api.routes import health
+from app.api.routes import datasets, health, info
 from app.config.settings import get_settings
+from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 
 
@@ -26,8 +27,17 @@ def create_app() -> FastAPI:
         title="Agente de Analise de Dados com IA",
         version=__version__,
         description="Plataforma de analise de dados orquestrada por agentes de IA.",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
     )
+
+    register_exception_handlers(app)
+
+    app.include_router(info.router)
     app.include_router(health.router)
+    app.include_router(datasets.router)
+
     return app
 
 
