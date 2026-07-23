@@ -30,7 +30,7 @@ with col_status:
         )
     except APIError as exc:
         st.error(f"API respondeu com erro ({exc.status_code}): {exc.message}")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         st.error(f"Falha ao contactar a API: {exc}")
 
 with col_dataset:
@@ -48,12 +48,10 @@ with col_dataset:
 st.divider()
 
 st.subheader("Como usar")
-st.markdown(
-    """
+st.markdown("""
     1. Envie um CSV em **Upload**.
     2. Explore metadados e graficos em **Visualizations**.
     3. Treine modelos em **Training** e inspecione em **Explanations**.
     4. Peca insights em linguagem natural em **Insights**.
     5. Converse com o agente na aba **Chat**.
-    """
-)
+    """)

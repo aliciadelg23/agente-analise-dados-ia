@@ -23,7 +23,7 @@ if uploaded is not None:
         except APIError as exc:
             st.error(f"API retornou {exc.status_code}: {exc.message}")
             response = None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             show_error(exc)
             response = None
 

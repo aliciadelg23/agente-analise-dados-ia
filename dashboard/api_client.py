@@ -30,7 +30,9 @@ class APIClient:
     """Thin synchronous client over ``httpx``."""
 
     def __init__(self, base_url: str | None = None, timeout: float = DEFAULT_TIMEOUT) -> None:
-        self._base_url = (base_url or os.environ.get("API_BASE_URL") or "http://localhost:8000").rstrip("/")
+        self._base_url = (
+            base_url or os.environ.get("API_BASE_URL") or "http://localhost:8000"
+        ).rstrip("/")
         self._timeout = timeout
 
     @property

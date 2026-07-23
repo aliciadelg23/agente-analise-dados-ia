@@ -24,7 +24,7 @@ with st.spinner("Carregando colunas..."):
     except APIError as exc:
         st.error(f"API retornou {exc.status_code}: {exc.message}")
         st.stop()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         show_error(exc)
         st.stop()
 
@@ -51,7 +51,7 @@ if submitted and target:
         except APIError as exc:
             st.error(f"API retornou {exc.status_code}: {exc.message}")
             st.stop()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             show_error(exc)
             st.stop()
 
@@ -61,7 +61,9 @@ if submitted and target:
     col1, col2, col3 = st.columns(3)
     col1.metric("Amostras (train)", result.get("n_samples_train", "?"))
     col2.metric("Amostras (test)", result.get("n_samples_test", "?"))
-    col3.metric("Model ID", result.get("model_id", "?")[:8] + "..." if result.get("model_id") else "?")
+    col3.metric(
+        "Model ID", result.get("model_id", "?")[:8] + "..." if result.get("model_id") else "?"
+    )
 
     st.markdown("**Metricas dos candidatos**")
     candidates = result.get("candidates") or []

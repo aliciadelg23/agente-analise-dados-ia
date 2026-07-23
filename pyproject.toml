@@ -66,6 +66,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"] # allow assert in tests
+"dashboard/**/*.py" = ["N999"] # streamlit multi-page filenames use emojis
 
 [tool.ruff.format]
 quote-style = "double"

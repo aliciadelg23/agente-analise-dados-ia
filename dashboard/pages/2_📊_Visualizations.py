@@ -24,7 +24,7 @@ with st.spinner("Carregando resumo..."):
     except APIError as exc:
         st.error(f"API retornou {exc.status_code}: {exc.message}")
         st.stop()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         show_error(exc)
         st.stop()
 
@@ -66,7 +66,7 @@ with st.spinner("Gerando graficos..."):
     except APIError as exc:
         st.error(f"API retornou {exc.status_code}: {exc.message}")
         st.stop()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         show_error(exc)
         st.stop()
 

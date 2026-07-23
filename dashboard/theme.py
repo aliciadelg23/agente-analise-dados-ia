@@ -6,7 +6,6 @@ import streamlit as st
 
 from dashboard.api_client import APIClient
 
-
 PAGE_CONFIG = {
     "page_title": "Agente de Analise de Dados com IA",
     "page_icon": "🤖",

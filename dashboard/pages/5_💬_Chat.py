@@ -10,7 +10,9 @@ from dashboard.theme import apply_page_config, get_api_client, show_error
 apply_page_config("Chat - Dashboard")
 
 st.title("Conversa com o agente")
-st.caption("O agente LangChain tem acesso a 5 ferramentas: dataset info, EDA, statistics, ML, charts.")
+st.caption(
+    "O agente LangChain tem acesso a 5 ferramentas: dataset info, EDA, statistics, ML, charts."
+)
 
 client = get_api_client()
 
@@ -39,7 +41,7 @@ if user_input:
             output = response.get("output") or "(sem resposta)"
         except APIError as exc:
             output = f"❌ API retornou {exc.status_code}: {exc.message}"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             show_error(exc)
             output = f"❌ Falha: {exc}"
 
