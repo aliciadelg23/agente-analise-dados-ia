@@ -51,3 +51,29 @@ class ModelRepository:
         """Return the joblib path for ``model_id`` or None if missing."""
         candidate = self._base_dir / f"{model_id}.joblib"
         return candidate if candidate.exists() else None
+
+    def load(self, model_id: UUID) -> object:
+        """Load and return the persisted pipeline for ``model_id``.
+
+        Raises FileNotFoundError when the artifact is missing so
+        callers can translate to a domain-specific exception.
+
+        Safety: only loads artifacts we wrote ourselves via ``save``
+        under ``base_dir``; the path is derived from ``model_id`` and
+        never crosses the trust boundary, so pickle deserialization
+        stays inside server-controlled data.
+        """
+        path = self.find(model_id)
+        if path is None:
+            raise FileNotFoundError(f"Model '{model_id}' not found in {self._base_dir}")
+        return joblib.load(path)
+
+    def read_manifest(self, model_id: UUID) -> dict[str, Any]:
+        """Return the JSON manifest for ``model_id``.
+
+        Raises FileNotFoundError when the manifest is missing.
+        """
+        manifest_path = self._base_dir / f"{model_id}.json"
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"Manifest for model '{model_id}' not found")
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
