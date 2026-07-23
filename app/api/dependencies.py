@@ -18,6 +18,7 @@ from app.services.chart_service import ChartService
 from app.services.cleaning_service import CleaningService
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import EDAService
+from app.services.explainability_service import ExplainabilityService
 from app.services.ml_pipeline_service import MLPipelineService
 
 
@@ -82,3 +83,18 @@ def get_ml_pipeline_service(
     dataset_repo = _dataset_repository(settings.storage_dir)
     model_repo = _model_repository(settings.storage_dir, settings.models_dir_name)
     return MLPipelineService(dataset_repository=dataset_repo, model_repository=model_repo)
+
+
+def get_explainability_service(
+    settings: Settings = Depends(get_settings),
+) -> ExplainabilityService:
+    """Return an ExplainabilityService bound to the current settings."""
+    dataset_repo = _dataset_repository(settings.storage_dir)
+    model_repo = _model_repository(settings.storage_dir, settings.models_dir_name)
+    charts_dir = Path(settings.storage_dir) / "charts"
+    return ExplainabilityService(
+        dataset_repository=dataset_repo,
+        model_repository=model_repo,
+        charts_dir=charts_dir,
+        url_prefix=settings.charts_static_url_prefix,
+    )
